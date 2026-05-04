@@ -138,6 +138,42 @@ export default function CreateCompany() {
         throw new Error(`Erro ao criar funcionário: ${employeeError.message}`);
       }
 
+      // Provisionar conta automaticamente no builder-flow-api (TalkMap)
+      try {
+        // Criar stub da integração
+        await supabase
+          .from('chatbot_integration')
+          .insert([{
+            company_id: companyData.id,
+            builder_base_url: 'https://talkbuilder.lovable.app',
+            builder_workspace_slug: formData.slug,
+            is_active: false,
+            talkmap_provisioned: false,
+          }]);
+
+        const provisionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/provision-talkmap`;
+        const provRes = await fetch(provisionUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: formData.owner_email,
+            password: formData.owner_password,
+            slug: formData.slug,
+            display_name: formData.owner_name,
+            plan: 'starter',
+            company_id: companyData.id,
+          }),
+        });
+        const provResult = await provRes.json();
+        if (provResult.ok) {
+          console.log('✅ Conta TalkMap provisionada:', provResult);
+        } else {
+          console.warn('⚠️ Falha ao provisionar TalkMap:', provResult.error);
+        }
+      } catch (provErr) {
+        console.warn('⚠️ Erro ao provisionar TalkMap (não bloqueante):', provErr);
+      }
+
       toast({
         title: "Empresa criada com sucesso!",
         description: "A empresa foi cadastrada e o proprietário pode fazer login.",

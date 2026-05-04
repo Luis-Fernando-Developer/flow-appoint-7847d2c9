@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.chatbot-integration]
 verify_jwt = false
+
+[functions.provision-talkmap]
+verify_jwt = false

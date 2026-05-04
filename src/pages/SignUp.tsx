@@ -225,6 +225,31 @@ export default function SignUp() {
           talkmap_provisioned: false,
         }]);
 
+      // 4.1 Provisionar conta automaticamente no builder-flow-api (TalkMap)
+      try {
+        const provisionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/provision-talkmap`;
+        const provRes = await fetch(provisionUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: formData.ownerMail,
+            password: formData.ownerPass,
+            slug: formData.customUrl,
+            display_name: formData.ownerName,
+            plan: 'starter',
+            company_id: companyData.id,
+          }),
+        });
+        const provResult = await provRes.json();
+        if (provResult.ok) {
+          console.log('✅ Conta TalkMap provisionada:', provResult);
+        } else {
+          console.warn('⚠️ Falha ao provisionar TalkMap:', provResult.error);
+        }
+      } catch (provErr) {
+        console.warn('⚠️ Erro ao provisionar TalkMap (não bloqueante):', provErr);
+      }
+
       // 5. Criar subscription se tiver plano selecionado
       if (selectedPlan) {
         await supabase

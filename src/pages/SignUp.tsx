@@ -457,7 +457,7 @@ export default function SignUp() {
                   value={formData.ownerPass}
                   onChange={(e) => handleInputChange('ownerPass', e.target.value)}
                   className="bg-background/50 border-primary/30 focus:border-primary"
-                  minLength={6}
+                  minLength={8}
                   required
                 />
               </div>
@@ -472,7 +472,7 @@ export default function SignUp() {
                   value={formData.ownerPassRepeat}
                   onChange={(e) => handleInputChange('ownerPassRepeat', e.target.value)}
                   className="bg-background/50 border-primary/30 focus:border-primary"
-                  minLength={6}
+                  minLength={8}
                   required
                 />
               </div>

@@ -146,7 +146,7 @@ export function Pricing() {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
         ) : (
-          <div className="grid lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
+          <div className="grid lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
             {plans.map((plan, index) => {
               const Icon = iconMap[plan.name] || Zap;
               const isPopular = index === 1; // Middle plan is popular

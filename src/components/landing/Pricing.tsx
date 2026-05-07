@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Check, Zap, Crown, Rocket } from "lucide-react";
+import { Check, Zap, Crown, Rocket, Gem } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 
 interface Plan {
@@ -17,9 +17,10 @@ interface Plan {
 }
 
 const iconMap: Record<string, any> = {
-  'Starter': Zap,
-  'Professional': Crown,
-  'Enterprise': Rocket
+  'Prata': Zap,
+  'Ouro': Crown,
+  'Diamante': Rocket,
+  'Ruby': Gem
 };
 
 export function Pricing() {

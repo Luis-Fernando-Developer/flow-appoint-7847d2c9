@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Check, Zap, Crown, Rocket } from "lucide-react";
+import { Check, Zap, Crown, Rocket, Gem } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 
 interface Plan {
@@ -17,9 +17,10 @@ interface Plan {
 }
 
 const iconMap: Record<string, any> = {
-  'Starter': Zap,
-  'Professional': Crown,
-  'Enterprise': Rocket
+  'Prata': Zap,
+  'Ouro': Crown,
+  'Diamante': Rocket,
+  'Ruby': Gem
 };
 
 export function Pricing() {
@@ -145,7 +146,7 @@ export function Pricing() {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
         ) : (
-          <div className="grid lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
+          <div className="grid lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
             {plans.map((plan, index) => {
               const Icon = iconMap[plan.name] || Zap;
               const isPopular = index === 1; // Middle plan is popular
@@ -173,8 +174,14 @@ export function Pricing() {
                     <CardTitle className="text-2xl">{plan.name}</CardTitle>
                     <CardDescription>Plano {plan.name}</CardDescription>
                     <div className="pt-4">
-                      <span className="text-4xl font-bold text-gradient">{formatPrice(getPrice(plan))}</span>
-                      <span className="text-muted-foreground">{getPeriodLabel()}</span>
+                      {plan.name === 'Ruby' || getPrice(plan) === 0 ? (
+                        <span className="text-2xl font-bold text-gradient">Sob consulta</span>
+                      ) : (
+                        <>
+                          <span className="text-4xl font-bold text-gradient">{formatPrice(getPrice(plan))}</span>
+                          <span className="text-muted-foreground">{getPeriodLabel()}</span>
+                        </>
+                      )}
                     </div>
                   </CardHeader>
 
@@ -194,7 +201,7 @@ export function Pricing() {
                       size="lg"
                       onClick={() => handleSelectPlan(plan)}
                     >
-                      {isPopular ? "Começar Agora" : "Escolher Plano"}
+                      {plan.name === 'Ruby' ? "Fale Conosco" : isPopular ? "Começar Agora" : "Escolher Plano"}
                     </Button>
                   </CardContent>
                 </Card>

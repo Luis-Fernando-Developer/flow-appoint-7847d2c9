@@ -38,7 +38,7 @@ export function Pricing() {
         .from('subscription_plans')
         .select('*')
         .eq('is_active', true)
-        .order('display_order');
+        .order('monthly_price');
 
       if (error) throw error;
       

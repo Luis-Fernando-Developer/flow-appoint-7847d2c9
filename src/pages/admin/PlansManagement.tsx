@@ -62,7 +62,7 @@ export default function PlansManagement() {
       const { data, error } = await supabase
         .from('subscription_plans')
         .select('*')
-        .order('display_order');
+        .order('monthly_price');
 
       if (error) throw error;
       

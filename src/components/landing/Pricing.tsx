@@ -201,7 +201,7 @@ export function Pricing() {
                       size="lg"
                       onClick={() => handleSelectPlan(plan)}
                     >
-                      {isPopular ? "Começar Agora" : "Escolher Plano"}
+                      {plan.name === 'Ruby' ? "Fale Conosco" : isPopular ? "Começar Agora" : "Escolher Plano"}
                     </Button>
                   </CardContent>
                 </Card>

@@ -174,8 +174,14 @@ export function Pricing() {
                     <CardTitle className="text-2xl">{plan.name}</CardTitle>
                     <CardDescription>Plano {plan.name}</CardDescription>
                     <div className="pt-4">
-                      <span className="text-4xl font-bold text-gradient">{formatPrice(getPrice(plan))}</span>
-                      <span className="text-muted-foreground">{getPeriodLabel()}</span>
+                      {plan.name === 'Ruby' || getPrice(plan) === 0 ? (
+                        <span className="text-2xl font-bold text-gradient">Sob consulta</span>
+                      ) : (
+                        <>
+                          <span className="text-4xl font-bold text-gradient">{formatPrice(getPrice(plan))}</span>
+                          <span className="text-muted-foreground">{getPeriodLabel()}</span>
+                        </>
+                      )}
                     </div>
                   </CardHeader>
 

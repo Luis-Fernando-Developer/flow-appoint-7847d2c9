@@ -275,11 +275,14 @@ export default function SignUp() {
         window.location.href = `/${formData.customUrl}/admin/login`;
       }
       
-    } catch (error) {
-      console.error("❌ Erro geral ao cadastrar empresa:", error);
+    } catch (error: any) {
+      console.error("❌ Erro geral ao cadastrar empresa:", JSON.stringify(error, null, 2));
+      console.error("❌ Error message:", error?.message);
+      console.error("❌ Error code:", error?.code);
+      console.error("❌ Error details:", error?.details);
       toast({
         title: "Erro ao cadastrar empresa",
-        description: "Ocorreu um erro ao cadastrar a empresa. Tente novamente.",
+        description: error?.message || "Ocorreu um erro ao cadastrar a empresa. Tente novamente.",
         variant: "destructive",
       });
       setIsLoading(false);

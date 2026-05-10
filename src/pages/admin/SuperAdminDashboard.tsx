@@ -96,14 +96,22 @@ export default function SuperAdminDashboard() {
 
   const fetchData = async () => {
     try {
-      // Buscar empresas
+      // Buscar empresas com seus planos
       const { data: companiesData } = await supabase
         .from('companies')
-        .select('*')
+        .select(`
+          *,
+          company_subscriptions(
+            status,
+            subscription_plans(
+              name
+            )
+          )
+        `)
         .order('created_at', { ascending: false });
 
       if (companiesData) {
-        setCompanies(companiesData);
+        setCompanies(companiesData as any);
 
         // Calcular estatísticas básicas
         const totalCompanies = companiesData.length;

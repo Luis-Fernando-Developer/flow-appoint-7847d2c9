@@ -50,6 +50,12 @@ interface Company {
   slug: string;
   created_at: string;
   address: string | null;
+  company_subscriptions?: {
+    status: string;
+    subscription_plans: {
+      name: string;
+    };
+  }[];
 }
 
 const getStatusBadge = (status: string) => {
@@ -90,14 +96,22 @@ export default function SuperAdminDashboard() {
 
   const fetchData = async () => {
     try {
-      // Buscar empresas
+      // Buscar empresas com seus planos
       const { data: companiesData } = await supabase
         .from('companies')
-        .select('*')
+        .select(`
+          *,
+          company_subscriptions(
+            status,
+            subscription_plans(
+              name
+            )
+          )
+        `)
         .order('created_at', { ascending: false });
 
       if (companiesData) {
-        setCompanies(companiesData);
+        setCompanies(companiesData as any);
 
         // Calcular estatísticas básicas
         const totalCompanies = companiesData.length;
@@ -313,7 +327,9 @@ export default function SuperAdminDashboard() {
                   <div className="flex items-center space-x-6  w-full justify-between">
                     <div className="text-center">
                       <p className="text-sm font-medium">Plano</p>
-                      <p className="text-xs text-muted-foreground">Starter</p>
+                      <p className="text-xs text-muted-foreground">
+                        {company.company_subscriptions?.[0]?.subscription_plans?.name || "Sem Plano"}
+                      </p>
                     </div>
                     <div className="text-center">
                       <p className="text-sm font-medium">Status</p>

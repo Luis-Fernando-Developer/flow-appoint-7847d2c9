@@ -198,44 +198,43 @@ export function EditCompanyDialog({ company, open, onOpenChange, onSuccess }: Ed
       if (companyError) throw companyError;
 
       // Handle subscription/discount
-      if (descontoEspecial && selectedPlanId) {
+      if (selectedPlanId) {
         const originalPrice = getCurrentPlanPrice();
+        const hasDiscount = descontoEspecial;
+        const discountPercentage = hasDiscount ? discountData.percentage : 0;
+        const discountCycles = hasDiscount ? discountData.cycles : 0;
 
         if (subscription) {
           // Update existing subscription
-          await supabase
+          const { error: subError } = await supabase
             .from('company_subscriptions')
             .update({
               plan_id: selectedPlanId,
               billing_period: discountData.billingPeriod,
               original_price: originalPrice,
-              discount_percentage: discountData.percentage,
-              discount_cycles_remaining: discountData.cycles,
+              discount_percentage: discountPercentage,
+              discount_cycles_remaining: discountCycles,
+              status: 'active'
             })
             .eq('id', subscription.id);
+            
+          if (subError) throw subError;
         } else {
           // Create new subscription
-          await supabase
+          const { error: subError } = await supabase
             .from('company_subscriptions')
             .insert([{
               company_id: company.id,
               plan_id: selectedPlanId,
               billing_period: discountData.billingPeriod,
               original_price: originalPrice,
-              discount_percentage: discountData.percentage,
-              discount_cycles_remaining: discountData.cycles,
+              discount_percentage: discountPercentage,
+              discount_cycles_remaining: discountCycles,
               status: 'active'
             }]);
+            
+          if (subError) throw subError;
         }
-      } else if (subscription && subscription.discount_percentage > 0) {
-        // Remove discount
-        await supabase
-          .from('company_subscriptions')
-          .update({
-            discount_percentage: 0,
-            discount_cycles_remaining: 0
-          })
-          .eq('id', subscription.id);
       }
 
       toast({

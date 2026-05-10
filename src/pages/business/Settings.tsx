@@ -33,6 +33,7 @@ interface Employee {
 export default function BusinessSettings() {
   const { slug } = useParams<{ slug: string }>();
   const [company, setCompany] = useState<Company | null>(null);
+  const [subscription, setSubscription] = useState<any>(null);
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -57,16 +58,25 @@ export default function BusinessSettings() {
 
   const fetchData = async () => {
     try {
-      // Buscar dados da empresa
+      // Buscar dados da empresa com plano
       const { data: companyData } = await supabase
         .from('companies')
-        .select('*')
+        .select(`
+          *,
+          company_subscriptions(
+            *,
+            subscription_plans(*)
+          )
+        `)
         .eq('slug', slug)
         .single();
 
       if (!companyData) return;
 
       setCompany(companyData);
+      const activeSub = companyData.company_subscriptions?.[0];
+      setSubscription(activeSub);
+      
       setCompanyData({
         name: companyData.name || "",
         address: companyData.address || "",
@@ -316,7 +326,7 @@ export default function BusinessSettings() {
         {/* Personalização da Landing Page */}
         <LandingPageCustomizer 
           companyId={company.id}
-          companyPlan="starter"
+          companyPlan={subscription?.subscription_plans?.name?.toLowerCase() || "starter"}
           canEdit={canEditSettings}
           className=" flex w-full flex-col "
           
@@ -333,8 +343,8 @@ export default function BusinessSettings() {
           <CardContent>
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="font-semibold capitalize">Starter</h3>
-                <p className="text-sm text-muted-foreground">Status: {company.status}</p>
+                <h3 className="font-semibold capitalize">{subscription?.subscription_plans?.name || "Sem Plano"}</h3>
+                <p className="text-sm text-muted-foreground">Status: {subscription?.status || 'Inativo'}</p>
               </div>
               <Button variant="outline">
                 Gerenciar Plano

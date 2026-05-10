@@ -58,16 +58,25 @@ export default function BusinessSettings() {
 
   const fetchData = async () => {
     try {
-      // Buscar dados da empresa
+      // Buscar dados da empresa com plano
       const { data: companyData } = await supabase
         .from('companies')
-        .select('*')
+        .select(`
+          *,
+          company_subscriptions(
+            *,
+            subscription_plans(*)
+          )
+        `)
         .eq('slug', slug)
         .single();
 
       if (!companyData) return;
 
       setCompany(companyData);
+      const activeSub = companyData.company_subscriptions?.[0];
+      setSubscription(activeSub);
+      
       setCompanyData({
         name: companyData.name || "",
         address: companyData.address || "",

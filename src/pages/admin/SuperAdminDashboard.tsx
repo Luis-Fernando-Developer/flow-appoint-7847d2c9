@@ -50,6 +50,12 @@ interface Company {
   slug: string;
   created_at: string;
   address: string | null;
+  company_subscriptions?: {
+    status: string;
+    subscription_plans: {
+      name: string;
+    };
+  }[];
 }
 
 const getStatusBadge = (status: string) => {

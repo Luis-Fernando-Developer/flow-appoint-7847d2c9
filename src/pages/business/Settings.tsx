@@ -33,6 +33,7 @@ interface Employee {
 export default function BusinessSettings() {
   const { slug } = useParams<{ slug: string }>();
   const [company, setCompany] = useState<Company | null>(null);
+  const [subscription, setSubscription] = useState<any>(null);
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

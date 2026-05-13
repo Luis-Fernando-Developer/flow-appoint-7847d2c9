@@ -243,6 +243,9 @@ export function EditCompanyDialog({ company, open, onOpenChange, onSuccess }: Ed
         description: "Os dados da empresa foram atualizados com sucesso.",
       });
 
+      // Sincronizar tier do plano com o builder (status/plano podem ter mudado)
+      syncBuilderPlan(company.id);
+
       onSuccess();
       onOpenChange(false);
     } catch (error) {

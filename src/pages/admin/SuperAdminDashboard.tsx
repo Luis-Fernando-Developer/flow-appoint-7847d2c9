@@ -146,6 +146,9 @@ export default function SuperAdminDashboard() {
 
       if (error) throw error;
 
+      // Sincronizar status com o builder (paused/blocked → suspended)
+      syncBuilderPlan(companyId);
+
       toast({
         title: "Status atualizado",
         description: "Status da empresa atualizado com sucesso.",

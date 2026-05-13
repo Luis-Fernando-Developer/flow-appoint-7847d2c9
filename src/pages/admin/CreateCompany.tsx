@@ -174,6 +174,9 @@ export default function CreateCompany() {
         console.warn('⚠️ Erro ao provisionar TalkMap (não bloqueante):', provErr);
       }
 
+      // Sincronizar tier do plano com o builder
+      syncBuilderPlan(companyData.id);
+
       toast({
         title: "Empresa criada com sucesso!",
         description: "A empresa foi cadastrada e o proprietário pode fazer login.",

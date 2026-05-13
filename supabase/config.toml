@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.provision-talkmap]
 verify_jwt = false
+
+[functions.sync-builder-plan]
+verify_jwt = false

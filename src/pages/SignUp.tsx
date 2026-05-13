@@ -234,6 +234,9 @@ export default function SignUp() {
         status: "pending",
       }]);
 
+      // 5.1 Sincronizar tier do plano com o builder-flow-api
+      syncBuilderPlan(companyData.id);
+
       toast({ title: "Cadastro realizado com sucesso!", description: `Sua empresa ${formData.companyName} foi cadastrada!` });
       window.location.href = `/${formData.customUrl}/admin/login`;
     } catch (error: any) {

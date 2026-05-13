@@ -8,6 +8,7 @@ import { BookingLogo } from "@/components/BookingLogo";
 import { Building2, User, Mail, FileText, Check, X, CreditCard, Zap, Crown, Rocket, Gem } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabaseClient";
+import { syncBuilderPlan } from "@/lib/syncBuilderPlan";
 
 // Mapeamento plano Flow-Appoint → plano builder-flow-api
 const PLAN_TO_BUILDER: Record<string, string> = {
@@ -233,6 +234,9 @@ export default function SignUp() {
         original_price: getPrice(selectedPlan),
         status: "pending",
       }]);
+
+      // 5.1 Sincronizar tier do plano com o builder-flow-api
+      syncBuilderPlan(companyData.id);
 
       toast({ title: "Cadastro realizado com sucesso!", description: `Sua empresa ${formData.companyName} foi cadastrada!` });
       window.location.href = `/${formData.customUrl}/admin/login`;

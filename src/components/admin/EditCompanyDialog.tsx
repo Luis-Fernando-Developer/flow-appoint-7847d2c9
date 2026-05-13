@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent } from "@/components/ui/card";
 import { supabase } from "@/lib/supabaseClient";
+import { syncBuilderPlan } from "@/lib/syncBuilderPlan";
 import { useToast } from "@/hooks/use-toast";
 import { Calculator, Percent } from "lucide-react";
 
@@ -241,6 +242,9 @@ export function EditCompanyDialog({ company, open, onOpenChange, onSuccess }: Ed
         title: "Empresa atualizada",
         description: "Os dados da empresa foram atualizados com sucesso.",
       });
+
+      // Sincronizar tier do plano com o builder (status/plano podem ter mudado)
+      syncBuilderPlan(company.id);
 
       onSuccess();
       onOpenChange(false);

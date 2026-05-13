@@ -509,6 +509,7 @@ export type Database = {
       companies: {
         Row: {
           address: string | null
+          builder_synced_at: string | null
           created_at: string
           id: string
           name: string
@@ -521,6 +522,7 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          builder_synced_at?: string | null
           created_at?: string
           id?: string
           name: string
@@ -533,6 +535,7 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          builder_synced_at?: string | null
           created_at?: string
           id?: string
           name?: string
@@ -1202,6 +1205,7 @@ export type Database = {
       subscription_plans: {
         Row: {
           annual_price: number
+          builder_tier: string
           created_at: string
           features: Json | null
           id: string
@@ -1213,6 +1217,7 @@ export type Database = {
         }
         Insert: {
           annual_price?: number
+          builder_tier?: string
           created_at?: string
           features?: Json | null
           id?: string
@@ -1224,6 +1229,7 @@ export type Database = {
         }
         Update: {
           annual_price?: number
+          builder_tier?: string
           created_at?: string
           features?: Json | null
           id?: string

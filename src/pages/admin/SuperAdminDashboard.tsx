@@ -38,6 +38,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { supabase } from "@/lib/supabaseClient";
+import { syncBuilderPlan } from "@/lib/syncBuilderPlan";
 import { useToast } from "@/hooks/use-toast";
 
 interface Company {
@@ -144,6 +145,9 @@ export default function SuperAdminDashboard() {
         .eq('id', companyId);
 
       if (error) throw error;
+
+      // Sincronizar status com o builder (paused/blocked → suspended)
+      syncBuilderPlan(companyId);
 
       toast({
         title: "Status atualizado",

@@ -8,6 +8,7 @@ import { BookingLogo } from "@/components/BookingLogo";
 import { Building2, User, Mail, FileText, Check, X, CreditCard, Zap, Crown, Rocket, Gem } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabaseClient";
+import { syncBuilderPlan } from "@/lib/syncBuilderPlan";
 
 // Mapeamento plano Flow-Appoint → plano builder-flow-api
 const PLAN_TO_BUILDER: Record<string, string> = {

@@ -9,6 +9,7 @@ import { BookingLogo } from "@/components/BookingLogo";
 import { ArrowLeft, Building2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabaseClient";
+import { syncBuilderPlan } from "@/lib/syncBuilderPlan";
 
 interface CompanyForm {
   name: string;

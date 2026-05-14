@@ -137,9 +137,16 @@ export function EmployeeScheduleConfig({ companyId }: EmployeeScheduleConfigProp
   const handleSave = async () => {
     setSaving(true);
     try {
+      // Delete-then-insert (tabela sem unique constraint confiável)
+      const { error: delError } = await supabase
+        .from('employee_schedules')
+        .delete()
+        .eq('employee_id', selectedEmployee);
+      if (delError) throw delError;
+
       const { error } = await supabase
         .from('employee_schedules')
-        .upsert(
+        .insert(
           schedules.map(s => ({
             company_id: companyId,
             employee_id: selectedEmployee,
@@ -149,8 +156,7 @@ export function EmployeeScheduleConfig({ companyId }: EmployeeScheduleConfigProp
             end_time: s.end_time,
             break_start: s.break_start || null,
             break_end: s.break_end || null,
-          })),
-          { onConflict: 'employee_id,day_of_week' }
+          }))
         );
 
       if (error) throw error;

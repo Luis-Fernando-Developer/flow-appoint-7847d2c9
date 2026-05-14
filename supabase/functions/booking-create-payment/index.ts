@@ -1,7 +1,6 @@
-// Cria cobrança no Asaas para um agendamento e devolve dados de pagamento
-// (PIX QR / link cartão / boleto). Funciona nos 3 modos:
-// - asaas_managed: usa key da plataforma com split para subconta da empresa
-// - own_gateway: usa key própria da empresa (asaas)
+// Cria cobrança no Asaas para um agendamento usando a API key da própria empresa.
+// Modos suportados:
+// - own_gateway: usa key própria descriptografada da empresa
 // - none: erro (não permite gerar pagamento)
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { asaas, corsHeaders, findOrCreateClientCustomer, addDays } from "../_shared/asaas.ts";
@@ -29,7 +28,6 @@ Deno.serve(async (req) => {
     const body = (await req.json()) as Body;
     if (!body.booking_id || !body.method) return json({ error: "campos obrigatórios" }, 400);
 
-    // Load booking + service + company settings
     const { data: booking, error: berr } = await supabase
       .from("bookings")
       .select("id, company_id, client_id, service_id, services(name, price), companies(name)")
@@ -47,7 +45,9 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     const mode = settings?.payment_mode || "none";
-    if (mode === "none") return json({ error: "Empresa não aceita pagamento online" }, 400);
+    if (mode !== "own_gateway") {
+      return json({ error: "Empresa não aceita pagamento online" }, 400);
+    }
 
     const accepted = (settings?.accepted_methods || {}) as Record<string, boolean>;
     const methodKey = body.method === "PIX" ? "pix"
@@ -55,31 +55,18 @@ Deno.serve(async (req) => {
       : body.method === "DEBIT_CARD" ? "debit_card" : "boleto";
     if (!accepted[methodKey]) return json({ error: "Método não aceito por esta empresa" }, 400);
 
-    // Resolve API key + split
-    let overrideKey: string | undefined;
-    let split: any[] | undefined;
-    let platformFee = 0;
-
-    if (mode === "asaas_managed") {
-      // Platform key + split to subaccount wallet
-      const { data: acc } = await supabase
-        .from("company_payment_accounts")
-        .select("asaas_wallet_id, status")
-        .eq("company_id", booking.company_id)
-        .maybeSingle();
-      if (!acc?.asaas_wallet_id || acc.status !== "active") {
-        return json({ error: "Subconta da empresa não ativa" }, 400);
-      }
-      const feePct = Number(settings?.platform_fee_percentage || 0);
-      platformFee = amount * (feePct / 100);
-      const merchantValue = amount - platformFee;
-      split = [{ walletId: acc.asaas_wallet_id, fixedValue: merchantValue }];
-    } else if (mode === "own_gateway") {
-      overrideKey = settings?.own_gateway_api_key_encrypted || undefined;
-      if (!overrideKey) return json({ error: "Empresa sem gateway configurado" }, 400);
+    if (!settings?.own_gateway_api_key_encrypted) {
+      return json({ error: "Empresa sem gateway configurado" }, 400);
     }
 
-    // Ensure client + customer
+    // Decrypt API key via RPC
+    const { data: decKey, error: decErr } = await supabase.rpc("decrypt_chatbot_key", {
+      p_cipher: settings.own_gateway_api_key_encrypted,
+      p_secret: "asaas-own-gateway",
+    });
+    if (decErr || !decKey) return json({ error: "Falha ao ler chave do gateway" }, 500);
+    const overrideKey = decKey as string;
+
     const { data: client } = await supabase
       .from("clients")
       .select("id, name, email, phone, cpf")
@@ -94,7 +81,6 @@ Deno.serve(async (req) => {
       cpfCnpj: body.payer.cpf_cnpj || client?.cpf,
     }, overrideKey);
 
-    // Create charge
     const dueDate = addDays(new Date(), body.method === "BOLETO" ? 3 : 1);
     const charge = await asaas<any>(`/payments`, {
       method: "POST",
@@ -105,11 +91,9 @@ Deno.serve(async (req) => {
         dueDate,
         description: `${(booking as any).services?.name || "Serviço"} — ${(booking as any).companies?.name || ""}`,
         externalReference: `booking:${booking.id}`,
-        ...(split ? { split } : {}),
       }),
     }, overrideKey);
 
-    // Fetch PIX QR if PIX
     let pixQr: string | null = null;
     let pixPayload: string | null = null;
     if (body.method === "PIX") {
@@ -131,11 +115,10 @@ Deno.serve(async (req) => {
       bank_slip_url: charge.bankSlipUrl || null,
       pix_qr_code: pixQr,
       pix_payload: pixPayload,
-      platform_fee_amount: platformFee,
+      platform_fee_amount: 0,
       metadata: { mode, billingType: body.method },
     };
 
-    // Upsert (one payment per booking)
     await supabase.from("booking_payments").delete().eq("booking_id", booking.id);
     const { error: insErr } = await supabase.from("booking_payments").insert(paymentRow);
     if (insErr) console.error("[booking-create-payment] insert error", insErr);

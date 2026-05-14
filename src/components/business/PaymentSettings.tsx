@@ -4,11 +4,20 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Wallet, Building2, CreditCard, QrCode, Receipt, Banknote } from "lucide-react";
+import {
+  Loader2,
+  Wallet,
+  CreditCard,
+  QrCode,
+  Receipt,
+  Banknote,
+  CheckCircle2,
+  Copy,
+  ExternalLink,
+} from "lucide-react";
 
 interface Props {
   companyId: string;
@@ -24,65 +33,69 @@ const METHOD_META: Record<string, { label: string; icon: any; help?: string }> =
   boleto: { label: "Boleto bancário", icon: Receipt, help: "Confirmação em 1-3 dias úteis. Desligado por padrão." },
 };
 
-export function PaymentSettings({ companyId, companyName, ownerEmail, ownerPhone }: Props) {
+const WEBHOOK_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/asaas-webhook`;
+
+export function PaymentSettings({ companyId }: Props) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [onboarding, setOnboarding] = useState(false);
-  const [account, setAccount] = useState<any>(null);
+  const [validating, setValidating] = useState(false);
+  const [validatedAccount, setValidatedAccount] = useState<string | null>(null);
+  const [apiKeyInput, setApiKeyInput] = useState("");
+  const [hasStoredKey, setHasStoredKey] = useState(false);
   const [settings, setSettings] = useState<any>({
     payment_mode: "none",
     accepted_methods: { pix: true, credit_card: true, debit_card: true, boleto: false },
-    platform_fee_percentage: 0,
     own_gateway_provider: "asaas",
-    own_gateway_api_key_encrypted: "",
   });
-
-  // Onboarding form
-  const [obForm, setObForm] = useState({
-    cpf_cnpj: "",
-    email: ownerEmail || "",
-    name: companyName,
-    birth_date: "",
-    mobile_phone: ownerPhone || "",
-    postal_code: "",
-    address: "",
-    address_number: "",
-    province: "",
-    company_type: "MEI",
-    income_value: 5000,
-  });
-
-  const cpfCnpjDigits = obForm.cpf_cnpj.replace(/\D/g, "");
-  const isCnpj = cpfCnpjDigits.length === 14;
-  const isCpf = cpfCnpjDigits.length === 11;
 
   useEffect(() => { load(); }, [companyId]);
 
   async function load() {
     setLoading(true);
-    const [{ data: s }, { data: a }] = await Promise.all([
-      supabase.from("company_payment_settings").select("*").eq("company_id", companyId).maybeSingle(),
-      supabase.from("company_payment_accounts").select("*").eq("company_id", companyId).maybeSingle(),
-    ]);
-    if (s) setSettings({ ...settings, ...s });
-    setAccount(a || null);
+    const { data: s } = await (supabase as any)
+      .from("company_payment_settings")
+      .select("*")
+      .eq("company_id", companyId)
+      .maybeSingle();
+    if (s) {
+      setSettings({
+        payment_mode: s.payment_mode || "none",
+        accepted_methods: s.accepted_methods || { pix: true, credit_card: true, debit_card: true, boleto: false },
+        own_gateway_provider: s.own_gateway_provider || "asaas",
+      });
+      setHasStoredKey(!!s.own_gateway_api_key_encrypted);
+    }
     setLoading(false);
   }
 
   async function save() {
     setSaving(true);
     try {
-      const { error } = await supabase.from("company_payment_settings").upsert({
+      const payload: any = {
         company_id: companyId,
         payment_mode: settings.payment_mode,
         accepted_methods: settings.accepted_methods,
-        platform_fee_percentage: settings.platform_fee_percentage,
         own_gateway_provider: settings.own_gateway_provider,
-        own_gateway_api_key_encrypted: settings.own_gateway_api_key_encrypted || null,
-      }, { onConflict: "company_id" });
+      };
+
+      // Se uma nova key foi digitada, criptografa via RPC
+      if (apiKeyInput.trim()) {
+        const { data: enc, error: encErr } = await (supabase as any).rpc("encrypt_chatbot_key", {
+          p_plain: apiKeyInput.trim(),
+          p_secret: "asaas-own-gateway",
+        });
+        if (encErr) throw encErr;
+        payload.own_gateway_api_key_encrypted = enc;
+      }
+
+      const { error } = await (supabase as any)
+        .from("company_payment_settings")
+        .upsert(payload, { onConflict: "company_id" });
       if (error) throw error;
       toast({ title: "Configurações salvas" });
+      setApiKeyInput("");
+      await load();
     } catch (e: any) {
       toast({ title: "Erro ao salvar", description: e.message, variant: "destructive" });
     } finally {
@@ -90,20 +103,25 @@ export function PaymentSettings({ companyId, companyName, ownerEmail, ownerPhone
     }
   }
 
-  async function onboard() {
-    setOnboarding(true);
+  async function validateKey() {
+    if (!apiKeyInput.trim()) {
+      toast({ title: "Cole a API key primeiro", variant: "destructive" });
+      return;
+    }
+    setValidating(true);
+    setValidatedAccount(null);
     try {
-      const { data, error } = await supabase.functions.invoke("asaas-onboard-subaccount", {
-        body: { company_id: companyId, ...obForm },
+      const { data, error } = await supabase.functions.invoke("validate-own-gateway-key", {
+        body: { api_key: apiKeyInput.trim(), provider: settings.own_gateway_provider },
       });
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
-      toast({ title: "Subconta criada com sucesso" });
-      await load();
+      setValidatedAccount((data as any).account_name || "Conta validada");
+      toast({ title: "Chave válida", description: (data as any).account_name });
     } catch (e: any) {
-      toast({ title: "Erro no onboarding", description: e.message, variant: "destructive" });
+      toast({ title: "Falha ao validar", description: e.message, variant: "destructive" });
     } finally {
-      setOnboarding(false);
+      setValidating(false);
     }
   }
 
@@ -111,116 +129,123 @@ export function PaymentSettings({ companyId, companyName, ownerEmail, ownerPhone
     setSettings({ ...settings, accepted_methods: { ...settings.accepted_methods, [key]: value } });
   }
 
+  function copy(text: string) {
+    navigator.clipboard.writeText(text);
+    toast({ title: "Copiado!" });
+  }
+
   if (loading) {
     return <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin" /></div>;
   }
 
-  const isManaged = settings.payment_mode === "asaas_managed";
-  const isOwn = settings.payment_mode === "own_gateway";
-  const subaccountActive = account?.status === "active" && account?.asaas_wallet_id;
+  const enabled = settings.payment_mode === "own_gateway";
 
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Wallet className="w-5 h-5" /> Modo de recebimento</CardTitle>
-          <CardDescription>Como sua empresa recebe pagamentos online dos clientes finais.</CardDescription>
+          <CardTitle className="flex items-center gap-2"><Wallet className="w-5 h-5" /> Pagamento online</CardTitle>
+          <CardDescription>
+            Decida se seus clientes podem pagar online ao agendar. Quando ativado, você usa sua própria conta de
+            gateway — o pagamento cai 100% na sua conta, sem taxas adicionais da plataforma.
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <RadioGroup
-            value={settings.payment_mode}
-            onValueChange={(v) => setSettings({ ...settings, payment_mode: v })}
-            className="space-y-3"
-          >
-            <label className="flex items-start gap-3 p-4 border rounded-lg cursor-pointer hover:border-primary">
-              <RadioGroupItem value="none" id="m-none" className="mt-1" />
+          <div className="flex items-center justify-between p-4 border rounded-lg">
+            <div className="flex items-start gap-3">
+              <Banknote className="w-5 h-5 text-muted-foreground mt-1" />
               <div>
-                <div className="font-medium flex items-center gap-2"><Banknote className="w-4 h-4" /> Sem pagamento online</div>
-                <p className="text-sm text-muted-foreground">Cliente apenas agenda; pagamento é presencial.</p>
+                <div className="font-medium">Aceitar pagamento online</div>
+                <p className="text-sm text-muted-foreground">
+                  Desligado: cliente apenas agenda e paga presencialmente.
+                </p>
               </div>
-            </label>
-            <label className="flex items-start gap-3 p-4 border rounded-lg cursor-pointer hover:border-primary">
-              <RadioGroupItem value="asaas_managed" id="m-managed" className="mt-1" />
-              <div className="flex-1">
-                <div className="font-medium flex items-center gap-2">
-                  <Building2 className="w-4 h-4" /> Asaas Gerenciado
-                  {subaccountActive && <Badge variant="secondary">Ativo</Badge>}
-                </div>
-                <p className="text-sm text-muted-foreground">Plataforma cuida de tudo. Requer onboarding rápido com CNPJ/CPF.</p>
-              </div>
-            </label>
-            <label className="flex items-start gap-3 p-4 border rounded-lg cursor-pointer hover:border-primary">
-              <RadioGroupItem value="own_gateway" id="m-own" className="mt-1" />
-              <div>
-                <div className="font-medium">Gateway próprio (Asaas)</div>
-                <p className="text-sm text-muted-foreground">Use sua própria API key. Pagamento cai 100% na sua conta.</p>
-              </div>
-            </label>
-          </RadioGroup>
+            </div>
+            <Switch
+              checked={enabled}
+              onCheckedChange={(v) => setSettings({ ...settings, payment_mode: v ? "own_gateway" : "none" })}
+            />
+          </div>
         </CardContent>
       </Card>
 
-      {isManaged && !subaccountActive && (
-        <Card className="border-primary/40">
-          <CardHeader>
-            <CardTitle>Onboarding da subconta Asaas</CardTitle>
-            <CardDescription>Preencha os dados para abrir sua subconta de recebimento.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div><Label>CPF ou CNPJ *</Label><Input value={obForm.cpf_cnpj} onChange={(e) => setObForm({ ...obForm, cpf_cnpj: e.target.value })} /></div>
-              <div><Label>E-mail *</Label><Input type="email" value={obForm.email} onChange={(e) => setObForm({ ...obForm, email: e.target.value })} /></div>
-              <div><Label>Nome / Razão social *</Label><Input value={obForm.name} onChange={(e) => setObForm({ ...obForm, name: e.target.value })} /></div>
-              <div><Label>Telefone</Label><Input value={obForm.mobile_phone} onChange={(e) => setObForm({ ...obForm, mobile_phone: e.target.value })} /></div>
-              {!isCnpj && (
-                <div><Label>Data de nascimento {isCpf && "*"}</Label><Input type="date" value={obForm.birth_date} onChange={(e) => setObForm({ ...obForm, birth_date: e.target.value })} /></div>
-              )}
-              {isCnpj && (
-                <div>
-                  <Label>Tipo de empresa</Label>
-                  <select className="w-full h-10 px-3 border rounded-md bg-background" value={obForm.company_type} onChange={(e) => setObForm({ ...obForm, company_type: e.target.value })}>
-                    <option value="MEI">MEI</option>
-                    <option value="LIMITED">LTDA</option>
-                    <option value="INDIVIDUAL">Empresário individual</option>
-                    <option value="ASSOCIATION">Associação</option>
-                  </select>
-                </div>
-              )}
-              <div><Label>CEP</Label><Input value={obForm.postal_code} onChange={(e) => setObForm({ ...obForm, postal_code: e.target.value })} /></div>
-              <div className="col-span-2"><Label>Endereço</Label><Input value={obForm.address} onChange={(e) => setObForm({ ...obForm, address: e.target.value })} /></div>
-              <div><Label>Número</Label><Input value={obForm.address_number} onChange={(e) => setObForm({ ...obForm, address_number: e.target.value })} /></div>
-              <div><Label>Bairro</Label><Input value={obForm.province} onChange={(e) => setObForm({ ...obForm, province: e.target.value })} /></div>
-              <div className="col-span-2"><Label>Faturamento mensal estimado (R$) *</Label><Input type="number" min={0} value={obForm.income_value} onChange={(e) => setObForm({ ...obForm, income_value: Number(e.target.value) })} /></div>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {isCpf ? "Pessoa Física: data de nascimento obrigatória." : isCnpj ? "Pessoa Jurídica: tipo de empresa obrigatório." : "Informe um CPF (11 dígitos) ou CNPJ (14 dígitos)."}
-            </p>
-            <Button onClick={onboard} disabled={onboarding || !obForm.cpf_cnpj || !obForm.email || !obForm.income_value || (isCpf && !obForm.birth_date) || (!isCpf && !isCnpj)}>
-              {onboarding && <Loader2 className="w-4 h-4 mr-2 animate-spin" />} Criar subconta
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {isOwn && (
+      {enabled && (
         <Card>
           <CardHeader>
-            <CardTitle>Sua API key Asaas</CardTitle>
-            <CardDescription>Cole sua chave de API. Recomendamos criar uma chave dedicada.</CardDescription>
+            <CardTitle>Gateway de pagamento</CardTitle>
+            <CardDescription>Conecte sua conta para gerar cobranças.</CardDescription>
           </CardHeader>
-          <CardContent>
-            <Label>API Key</Label>
-            <Input
-              type="password"
-              value={settings.own_gateway_api_key_encrypted || ""}
-              onChange={(e) => setSettings({ ...settings, own_gateway_api_key_encrypted: e.target.value })}
-              placeholder="$aact_..."
-            />
+          <CardContent className="space-y-4">
+            <div>
+              <Label>Provedor</Label>
+              <select
+                className="w-full h-10 px-3 border rounded-md bg-background"
+                value={settings.own_gateway_provider}
+                onChange={(e) => setSettings({ ...settings, own_gateway_provider: e.target.value })}
+              >
+                <option value="asaas">Asaas</option>
+                <option value="mercadopago" disabled>Mercado Pago (em breve)</option>
+                <option value="stripe" disabled>Stripe (em breve)</option>
+              </select>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <Label>API Key {hasStoredKey && <Badge variant="secondary" className="ml-2">Salva</Badge>}</Label>
+                {validatedAccount && (
+                  <span className="text-xs text-green-600 flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" /> {validatedAccount}
+                  </span>
+                )}
+              </div>
+              <Input
+                type="password"
+                value={apiKeyInput}
+                onChange={(e) => { setApiKeyInput(e.target.value); setValidatedAccount(null); }}
+                placeholder={hasStoredKey ? "•••••••••• (cole uma nova chave para substituir)" : "$aact_..."}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Crie uma chave no painel Asaas em <strong>Integrações → Chave de API</strong>.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-2"
+                onClick={validateKey}
+                disabled={validating || !apiKeyInput.trim()}
+              >
+                {validating && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Testar conexão
+              </Button>
+            </div>
+
+            <div className="rounded-lg border bg-muted/40 p-4 space-y-2">
+              <div className="font-medium text-sm">Webhook (opcional, mas recomendado)</div>
+              <p className="text-xs text-muted-foreground">
+                Cadastre esta URL no painel Asaas em <strong>Integrações → Webhooks</strong> para que confirmações
+                de pagamento atualizem o status do agendamento automaticamente.
+              </p>
+              <div className="flex items-center gap-2">
+                <Input readOnly value={WEBHOOK_URL} className="font-mono text-xs" />
+                <Button type="button" variant="outline" size="icon" onClick={() => copy(WEBHOOK_URL)}>
+                  <Copy className="w-4 h-4" />
+                </Button>
+              </div>
+              <a
+                href="https://www.asaas.com/customerWebhook/list"
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs text-primary inline-flex items-center gap-1 hover:underline"
+              >
+                Abrir painel Asaas <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
           </CardContent>
         </Card>
       )}
 
-      {settings.payment_mode !== "none" && (
+      {enabled && (
         <Card>
           <CardHeader>
             <CardTitle>Métodos aceitos</CardTitle>

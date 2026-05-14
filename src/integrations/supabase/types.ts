@@ -608,6 +608,57 @@ export type Database = {
         }
         Relationships: []
       }
+      company_credits: {
+        Row: {
+          amount: number
+          company_id: string
+          created_at: string
+          created_by_user_id: string | null
+          expires_at: string
+          id: string
+          metadata: Json | null
+          original_amount: number
+          reason: string
+          source: string
+          source_subscription_id: string | null
+          status: string
+          updated_at: string
+          used_at: string | null
+        }
+        Insert: {
+          amount?: number
+          company_id: string
+          created_at?: string
+          created_by_user_id?: string | null
+          expires_at: string
+          id?: string
+          metadata?: Json | null
+          original_amount?: number
+          reason: string
+          source?: string
+          source_subscription_id?: string | null
+          status?: string
+          updated_at?: string
+          used_at?: string | null
+        }
+        Update: {
+          amount?: number
+          company_id?: string
+          created_at?: string
+          created_by_user_id?: string | null
+          expires_at?: string
+          id?: string
+          metadata?: Json | null
+          original_amount?: number
+          reason?: string
+          source?: string
+          source_subscription_id?: string | null
+          status?: string
+          updated_at?: string
+          used_at?: string | null
+        }
+        Relationships: []
+      }
       company_customizations: {
         Row: {
           button_color: string | null

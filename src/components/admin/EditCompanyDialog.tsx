@@ -119,6 +119,24 @@ export function EditCompanyDialog({ company, open, onOpenChange, onSuccess }: Ed
     if (data) setPlans(data);
   };
 
+  const fetchAvailableCredits = async () => {
+    if (!company) return;
+    // Lazy expiration
+    await supabase
+      .from("company_credits")
+      .update({ status: "expired" })
+      .eq("company_id", company.id)
+      .eq("status", "active")
+      .lt("expires_at", new Date().toISOString());
+    const { data } = await supabase
+      .from("company_credits")
+      .select("amount")
+      .eq("company_id", company.id)
+      .eq("status", "active");
+    const total = (data || []).reduce((s: number, r: any) => s + Number(r.amount || 0), 0);
+    setAvailableCredits(total);
+  };
+
   const fetchSubscription = async () => {
     if (!company) return;
     

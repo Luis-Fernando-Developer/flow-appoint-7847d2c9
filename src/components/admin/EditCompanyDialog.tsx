@@ -143,7 +143,7 @@ export function EditCompanyDialog({ company, open, onOpenChange, onSuccess }: Ed
     const plan = getSelectedPlan();
     if (!plan) return 0;
 
-    switch (discountData.billingPeriod) {
+    switch (billingPeriod) {
       case 'quarterly':
         return plan.quarterly_price;
       case 'annual':

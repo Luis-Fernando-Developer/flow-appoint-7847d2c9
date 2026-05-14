@@ -66,7 +66,7 @@ const getStatusBadge = (status: string) => {
     blocked: { variant: "destructive" as const, label: "Bloqueada", color: "bg-red-500" }
   };
   
-  const config = variants[status as keyof typeof variants];
+  const config = variants[status as keyof typeof variants] ?? variants.active;
   return (
     <Badge variant={config.variant} className="gap-1">
       <div className={`w-2 h-2 rounded-full ${config.color}`}></div>

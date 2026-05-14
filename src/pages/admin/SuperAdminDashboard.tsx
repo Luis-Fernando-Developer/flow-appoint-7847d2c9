@@ -59,14 +59,14 @@ interface Company {
   }[];
 }
 
-const getStatusBadge = (status: string) => {
+const getStatusBadge = (status: string | null) => {
   const variants = {
     active: { variant: "default" as const, label: "Ativa", color: "bg-green-500" },
     paused: { variant: "secondary" as const, label: "Pausada", color: "bg-yellow-500" },
     blocked: { variant: "destructive" as const, label: "Bloqueada", color: "bg-red-500" }
   };
   
-  const config = variants[status as keyof typeof variants];
+  const config = variants[status as keyof typeof variants] ?? variants.active;
   return (
     <Badge variant={config.variant} className="gap-1">
       <div className={`w-2 h-2 rounded-full ${config.color}`}></div>
@@ -337,7 +337,7 @@ export default function SuperAdminDashboard() {
                     </div>
                     <div className="text-center">
                       <p className="text-sm font-medium">Status</p>
-                      {getStatusBadge(company.status)}
+                      {getStatusBadge(company.status ?? 'active')}
                     </div>
                     <div className="text-center">
                       <p className="text-sm font-medium">Receita</p>

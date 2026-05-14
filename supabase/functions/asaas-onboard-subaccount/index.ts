@@ -99,7 +99,7 @@ Deno.serve(async (req) => {
     return json({ ok: true, account: payload });
   } catch (e: any) {
     console.error("[asaas-onboard-subaccount]", e);
-    return json({ error: e.message || "erro" }, 500);
+    return json({ error: e.message || "erro" }, 200);
   }
 });
 

@@ -17,7 +17,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { supabase } from "@/lib/supabaseClient";
 import { syncBuilderPlan } from "@/lib/syncBuilderPlan";
 import { useToast } from "@/hooks/use-toast";
-import { Calculator, Percent } from "lucide-react";
+import { Calculator, Percent, AlertTriangle, X } from "lucide-react";
 
 // Aligned with database schema - companies table
 interface Company {

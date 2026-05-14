@@ -2,6 +2,7 @@
 // Body: { company_id, new_plan_id, billing_period? }
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { asaas, corsHeaders, addDays, toBRL } from "../_shared/asaas.ts";
+import { calculateProration, type BillingPeriod } from "../_shared/proration.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });

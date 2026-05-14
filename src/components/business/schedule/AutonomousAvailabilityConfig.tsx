@@ -97,17 +97,26 @@ export function AutonomousAvailabilityConfig({ companyId }: AutonomousAvailabili
 
   const handleAddAvailability = async () => {
     try {
+      const dateStr = format(newAvailability.date, 'yyyy-MM-dd');
+      // Delete-then-insert (sem unique constraint confiável)
+      const { error: delError } = await supabase
+        .from('employee_availability')
+        .delete()
+        .eq('employee_id', selectedEmployee)
+        .eq('available_date', dateStr);
+      if (delError) throw delError;
+
       const { error } = await supabase
         .from('employee_availability')
-        .upsert({
+        .insert({
           company_id: companyId,
           employee_id: selectedEmployee,
-          available_date: format(newAvailability.date, 'yyyy-MM-dd'),
+          available_date: dateStr,
           start_time: newAvailability.start_time,
           end_time: newAvailability.end_time,
           break_start: newAvailability.break_start || null,
           break_end: newAvailability.break_end || null,
-        }, { onConflict: 'employee_id,available_date' });
+        });
 
       if (error) throw error;
 

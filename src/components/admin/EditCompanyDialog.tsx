@@ -202,7 +202,25 @@ export function EditCompanyDialog({ company, open, onOpenChange, onSuccess }: Ed
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Cálculo de proporção em tempo real (apenas se já existe subscription).
+  const proration = (() => {
+    if (!subscription || !selectedPlanId) return null;
+    const planChanged = subscription.plan_id !== selectedPlanId || subscription.billing_period !== billingPeriod;
+    if (!planChanged) return null;
+    const newValue = getCurrentPlanPrice();
+    const cycleStart = subscription.starts_at ? new Date(subscription.starts_at) : new Date();
+    const cycleEnd = subscription.next_billing_date ? new Date(subscription.next_billing_date) : new Date(Date.now() + 30 * 86400000);
+    return calculateProration({
+      currentPaidValue: Number(subscription.original_price || 0),
+      currentPeriod: (subscription.billing_period as BillingPeriod) || "monthly",
+      cycleStart,
+      cycleEnd,
+      newValue,
+      newPeriod: billingPeriod as BillingPeriod,
+      availableCredits,
+      now: new Date(),
+    });
+  })();
     e.preventDefault();
     if (!company) return;
 

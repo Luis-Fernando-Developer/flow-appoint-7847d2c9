@@ -63,6 +63,7 @@ export function EditCompanyDialog({ company, open, onOpenChange, onSuccess }: Ed
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [descontoEspecial, setDescontoEspecial] = useState(false);
   const [selectedPlanId, setSelectedPlanId] = useState<string>("");
+  const [billingPeriod, setBillingPeriod] = useState<string>("monthly");
   
   const [formData, setFormData] = useState({
     name: "",
@@ -77,7 +78,6 @@ export function EditCompanyDialog({ company, open, onOpenChange, onSuccess }: Ed
   const [discountData, setDiscountData] = useState({
     percentage: 0,
     cycles: 1,
-    billingPeriod: "monthly"
   });
 
   // Fetch plans and subscription on open

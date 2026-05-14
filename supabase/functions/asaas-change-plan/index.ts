@@ -213,6 +213,7 @@ async function getCustomerId(companyId: string): Promise<string | null> {
   return r?.data?.[0]?.id || null;
 }
 
+function priceForPeriod(plan: any, period: string): number {
   if (period === "annual") return Number(plan.annual_price);
   if (period === "quarterly") return Number(plan.quarterly_price);
   return Number(plan.monthly_price);

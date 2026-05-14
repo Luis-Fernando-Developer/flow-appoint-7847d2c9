@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { BookingLogo } from "@/components/BookingLogo";
 import { Lock, Mail } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/lib/supabaseClient";
 
 export default function AdminLogin() {
   const [email, setEmail] = useState("");
@@ -19,30 +20,44 @@ export default function AdminLogin() {
     e.preventDefault();
     setIsLoading(true);
 
-    // Dados mocados conforme especificação
-    if (email === "sousa.fernando.luis@gmail.com" && password === "123456") {
+    try {
+      const { data: signIn, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (signInError || !signIn.user) {
+        throw new Error(signInError?.message || "Credenciais inválidas");
+      }
+
+      // Verifica se este usuário está cadastrado como super admin
+      const { data: isAdmin, error: rpcError } = await supabase.rpc("is_super_admin", {
+        _uid: signIn.user.id,
+      });
+      if (rpcError) throw rpcError;
+
+      if (!isAdmin) {
+        await supabase.auth.signOut();
+        throw new Error("Este usuário não tem permissão de Super Admin.");
+      }
+
       toast({
         title: "Login realizado com sucesso!",
         description: "Redirecionando para o painel Super Admin...",
       });
-      
-      setTimeout(() => {
-        navigate("/super-admin/painel");
-      }, 1000);
-    } else {
+      navigate("/super-admin/painel");
+    } catch (err: any) {
       toast({
         title: "Erro no login",
-        description: "Email ou senha incorretos.",
+        description: err.message || "Email ou senha incorretos.",
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
-    
-    setIsLoading(false);
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-hero p-4">
-      {/* Background Effects */}
       <div className="absolute inset-0">
         <div className="absolute top-20 left-20 w-72 h-72 bg-neon-violet/10 rounded-full blur-3xl animate-pulse-glow"></div>
         <div className="absolute bottom-20 right-20 w-96 h-96 bg-neon-pink/10 rounded-full blur-3xl animate-float"></div>
@@ -54,11 +69,9 @@ export default function AdminLogin() {
             <BookingLogo />
           </div>
           <CardTitle className="text-2xl text-gradient">Super Admin</CardTitle>
-          <CardDescription>
-            Acesse o painel de administração do sistema
-          </CardDescription>
+          <CardDescription>Acesse o painel de administração do sistema</CardDescription>
         </CardHeader>
-        
+
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-6">
             <div className="space-y-2">
@@ -93,22 +106,10 @@ export default function AdminLogin() {
               </div>
             </div>
 
-            <Button 
-              type="submit" 
-              variant="neon" 
-              className="w-full" 
-              disabled={isLoading}
-              size="lg"
-            >
+            <Button type="submit" variant="neon" className="w-full" disabled={isLoading} size="lg">
               {isLoading ? "Entrando..." : "Entrar no Sistema"}
             </Button>
           </form>
-
-          <div className="mt-6 pt-6 border-t border-primary/20">
-            <p className="text-xs text-muted-foreground text-center">
-              Dados de teste: sousa.fernando.luis@gmail.com / 123456
-            </p>
-          </div>
         </CardContent>
       </Card>
     </div>

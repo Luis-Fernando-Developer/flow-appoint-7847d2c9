@@ -1547,6 +1547,24 @@ export type Database = {
         }
         Relationships: []
       }
+      super_admins: {
+        Row: {
+          created_at: string
+          note: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          note?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          note?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -1560,6 +1578,8 @@ export type Database = {
         Args: { p_plain: string; p_secret: string }
         Returns: string
       }
+      is_super_admin: { Args: { _uid: string }; Returns: boolean }
+      user_company_id: { Args: { _uid: string }; Returns: string }
     }
     Enums: {
       [_ in never]: never

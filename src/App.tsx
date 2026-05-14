@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { RequireBusinessAuth } from "@/components/business/RequireBusinessAuth";
+import { RequireSuperAdmin } from "@/components/admin/RequireSuperAdmin";
 import LandingPage from "./pages/LandingPage";
 import AdminLogin from "./pages/admin/Login";
 import SuperAdminDashboard from "./pages/admin/SuperAdminDashboard";
@@ -54,9 +55,9 @@ const App = () => (
             {/* rota admin do sistema */}
             <Route path="/super-admin/login" element={<AdminLogin />} />
             {/* rota painel admin super admin */}
-            <Route path="/super-admin/painel" element={<SuperAdminDashboard />} />
+            <Route path="/super-admin/painel" element={<RequireSuperAdmin><SuperAdminDashboard /></RequireSuperAdmin>} />
             {/* rota para criar/adicionar empresa via painel super admin */}
-            <Route path="/super-admin/add-company" element={<CreateCompany />} />
+            <Route path="/super-admin/add-company" element={<RequireSuperAdmin><CreateCompany /></RequireSuperAdmin>} />
 
             {/* rotas protegidas do painel admin empresa */}
             <Route path="/:slug/admin/dashboard" element={<RequireBusinessAuth><BusinessDashboard /></RequireBusinessAuth>} />

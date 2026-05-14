@@ -98,10 +98,29 @@ async function handlePayment(event: string, p: any) {
 
   // Side effects
   if (status === "paid") {
-    // Mark payment method as default if we have a token
+    // Activate company on first confirmed payment
+    await supabase
+      .from("companies")
+      .update({ status: "active" })
+      .eq("id", companyId)
+      .eq("status", "pending_payment");
+
+    // Activate the subscription if it was pending
+    if (subscriptionId) {
+      await supabase
+        .from("company_subscriptions")
+        .update({ status: "active" })
+        .eq("id", subscriptionId)
+        .in("status", ["pending_payment", "pending", "past_due"]);
+    }
+
+    // Mark payment method as default — by token (card) or by billing_type
     if (p.creditCard?.creditCardToken) {
       await markDefaultByToken(companyId, p.creditCard.creditCardToken);
+    } else if (p.billingType === "PIX" || p.billingType === "BOLETO") {
+      await markDefaultByType(companyId, p.billingType);
     }
+
     // Apply pending plan change
     if (subscriptionId) {
       const { data: sub } = await supabase

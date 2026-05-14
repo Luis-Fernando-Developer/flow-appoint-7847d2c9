@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.asaas-billing-cron]
 verify_jwt = false
+
+[functions.asaas-test-flow]
+verify_jwt = false

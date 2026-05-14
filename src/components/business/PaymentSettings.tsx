@@ -50,7 +50,12 @@ export function PaymentSettings({ companyId, companyName, ownerEmail, ownerPhone
     address_number: "",
     province: "",
     company_type: "MEI",
+    income_value: 5000,
   });
+
+  const cpfCnpjDigits = obForm.cpf_cnpj.replace(/\D/g, "");
+  const isCnpj = cpfCnpjDigits.length === 14;
+  const isCpf = cpfCnpjDigits.length === 11;
 
   useEffect(() => { load(); }, [companyId]);
 
@@ -167,13 +172,30 @@ export function PaymentSettings({ companyId, companyName, ownerEmail, ownerPhone
               <div><Label>E-mail *</Label><Input type="email" value={obForm.email} onChange={(e) => setObForm({ ...obForm, email: e.target.value })} /></div>
               <div><Label>Nome / Razão social *</Label><Input value={obForm.name} onChange={(e) => setObForm({ ...obForm, name: e.target.value })} /></div>
               <div><Label>Telefone</Label><Input value={obForm.mobile_phone} onChange={(e) => setObForm({ ...obForm, mobile_phone: e.target.value })} /></div>
-              <div><Label>Data de nascimento</Label><Input type="date" value={obForm.birth_date} onChange={(e) => setObForm({ ...obForm, birth_date: e.target.value })} /></div>
+              {!isCnpj && (
+                <div><Label>Data de nascimento {isCpf && "*"}</Label><Input type="date" value={obForm.birth_date} onChange={(e) => setObForm({ ...obForm, birth_date: e.target.value })} /></div>
+              )}
+              {isCnpj && (
+                <div>
+                  <Label>Tipo de empresa</Label>
+                  <select className="w-full h-10 px-3 border rounded-md bg-background" value={obForm.company_type} onChange={(e) => setObForm({ ...obForm, company_type: e.target.value })}>
+                    <option value="MEI">MEI</option>
+                    <option value="LIMITED">LTDA</option>
+                    <option value="INDIVIDUAL">Empresário individual</option>
+                    <option value="ASSOCIATION">Associação</option>
+                  </select>
+                </div>
+              )}
               <div><Label>CEP</Label><Input value={obForm.postal_code} onChange={(e) => setObForm({ ...obForm, postal_code: e.target.value })} /></div>
               <div className="col-span-2"><Label>Endereço</Label><Input value={obForm.address} onChange={(e) => setObForm({ ...obForm, address: e.target.value })} /></div>
               <div><Label>Número</Label><Input value={obForm.address_number} onChange={(e) => setObForm({ ...obForm, address_number: e.target.value })} /></div>
               <div><Label>Bairro</Label><Input value={obForm.province} onChange={(e) => setObForm({ ...obForm, province: e.target.value })} /></div>
+              <div className="col-span-2"><Label>Faturamento mensal estimado (R$) *</Label><Input type="number" min={0} value={obForm.income_value} onChange={(e) => setObForm({ ...obForm, income_value: Number(e.target.value) })} /></div>
             </div>
-            <Button onClick={onboard} disabled={onboarding || !obForm.cpf_cnpj || !obForm.email}>
+            <p className="text-xs text-muted-foreground">
+              {isCpf ? "Pessoa Física: data de nascimento obrigatória." : isCnpj ? "Pessoa Jurídica: tipo de empresa obrigatório." : "Informe um CPF (11 dígitos) ou CNPJ (14 dígitos)."}
+            </p>
+            <Button onClick={onboard} disabled={onboarding || !obForm.cpf_cnpj || !obForm.email || !obForm.income_value || (isCpf && !obForm.birth_date) || (!isCpf && !isCnpj)}>
               {onboarding && <Loader2 className="w-4 h-4 mr-2 animate-spin" />} Criar subconta
             </Button>
           </CardContent>

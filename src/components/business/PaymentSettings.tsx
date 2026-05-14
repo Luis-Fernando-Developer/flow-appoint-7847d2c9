@@ -50,7 +50,12 @@ export function PaymentSettings({ companyId, companyName, ownerEmail, ownerPhone
     address_number: "",
     province: "",
     company_type: "MEI",
+    income_value: 5000,
   });
+
+  const cpfCnpjDigits = obForm.cpf_cnpj.replace(/\D/g, "");
+  const isCnpj = cpfCnpjDigits.length === 14;
+  const isCpf = cpfCnpjDigits.length === 11;
 
   useEffect(() => { load(); }, [companyId]);
 

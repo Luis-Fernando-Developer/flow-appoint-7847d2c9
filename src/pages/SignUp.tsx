@@ -412,7 +412,56 @@ export default function SignUp() {
                 </div>
               </div>
 
-              {/* Selected plan summary */}
+              {/* Phone */}
+              <div className="space-y-2">
+                <Label htmlFor="ownerPhone">Telefone (WhatsApp) *</Label>
+                <Input id="ownerPhone" placeholder="(11) 90000-0000" value={formData.ownerPhone} onChange={(e) => handleInputChange("ownerPhone", e.target.value)} className="bg-background/50 border-primary/30 focus:border-primary" required />
+              </div>
+
+              {/* Forma de pagamento */}
+              <div className="space-y-2">
+                <Label>Forma de pagamento *</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  {([
+                    { v: "PIX", label: "PIX", hint: "Confirmação imediata" },
+                    { v: "CREDIT_CARD", label: "Cartão", hint: "Débito recorrente" },
+                    { v: "BOLETO", label: "Boleto", hint: "Até 3 dias úteis" },
+                  ] as const).map((opt) => (
+                    <button
+                      key={opt.v}
+                      type="button"
+                      onClick={() => setBillingType(opt.v)}
+                      className={`p-3 rounded-md border text-center transition-all ${
+                        billingType === opt.v
+                          ? "border-primary bg-primary/10 ring-2 ring-primary/40"
+                          : "border-primary/20 hover:border-primary/50"
+                      }`}
+                    >
+                      <p className="font-semibold text-sm">{opt.label}</p>
+                      <p className="text-[10px] text-muted-foreground">{opt.hint}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Cartão (somente quando CREDIT_CARD) */}
+              {billingType === "CREDIT_CARD" && (
+                <div className="space-y-3 p-4 rounded-md border border-primary/20 bg-background/30">
+                  <p className="text-sm font-semibold">Dados do cartão</p>
+                  <Input placeholder="Nome impresso no cartão" value={formData.cardHolder} onChange={(e) => handleInputChange("cardHolder", e.target.value)} className="bg-background/50" required />
+                  <Input placeholder="Número do cartão" value={formData.cardNumber} onChange={(e) => handleInputChange("cardNumber", e.target.value.replace(/[^\d ]/g, ""))} maxLength={19} className="bg-background/50" required />
+                  <div className="grid grid-cols-3 gap-2">
+                    <Input placeholder="MM" value={formData.cardExpMonth} onChange={(e) => handleInputChange("cardExpMonth", e.target.value.replace(/\D/g, ""))} maxLength={2} className="bg-background/50" required />
+                    <Input placeholder="AAAA" value={formData.cardExpYear} onChange={(e) => handleInputChange("cardExpYear", e.target.value.replace(/\D/g, ""))} maxLength={4} className="bg-background/50" required />
+                    <Input placeholder="CVV" value={formData.cardCcv} onChange={(e) => handleInputChange("cardCcv", e.target.value.replace(/\D/g, ""))} maxLength={4} className="bg-background/50" required />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input placeholder="CEP" value={formData.cardZip} onChange={(e) => handleInputChange("cardZip", e.target.value.replace(/\D/g, ""))} maxLength={8} className="bg-background/50" required />
+                    <Input placeholder="Número endereço" value={formData.cardAddrNumber} onChange={(e) => handleInputChange("cardAddrNumber", e.target.value)} className="bg-background/50" required />
+                  </div>
+                </div>
+              )}
+
               {selectedPlan && selectedPlan.name !== "Ruby" && (
                 <Card className="bg-gradient-to-r from-primary/20 to-primary/5 border-primary/30">
                   <CardContent className="py-4">

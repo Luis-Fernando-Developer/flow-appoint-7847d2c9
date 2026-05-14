@@ -17,6 +17,7 @@ import BusinessBookings from "./pages/business/Bookings";
 import BusinessServices from "./pages/business/Services";
 import BusinessEmployees from "./pages/business/Employees";
 import BusinessSettings from "./pages/business/Settings";
+import BillingManagement from "./pages/business/BillingManagement";
 import BusinessProfile from "./pages/business/Profile";
 import ChatbotIntegracao from "./pages/business/chatbot/Integracao";
 import ChatbotTalkMap from "./pages/business/chatbot/TalkMap";
@@ -61,6 +62,7 @@ const App = () => (
             <Route path="/:slug/admin/servicos" element={<RequireBusinessAuth><BusinessServices /></RequireBusinessAuth>} />
             <Route path="/:slug/admin/colaboradores" element={<RequireBusinessAuth><BusinessEmployees /></RequireBusinessAuth>} />
             <Route path="/:slug/admin/configuracoes" element={<RequireBusinessAuth><BusinessSettings /></RequireBusinessAuth>} />
+            <Route path="/:slug/admin/billing" element={<RequireBusinessAuth><BillingManagement /></RequireBusinessAuth>} />
             <Route path="/:slug/admin/perfil" element={<RequireBusinessAuth><BusinessProfile /></RequireBusinessAuth>} />
             <Route path="/:slug/admin/chatbot" element={<RequireBusinessAuth><ChatbotIntegracao /></RequireBusinessAuth>} />
             <Route path="/:slug/admin/chatbot/integracao" element={<RequireBusinessAuth><ChatbotIntegracao /></RequireBusinessAuth>} />

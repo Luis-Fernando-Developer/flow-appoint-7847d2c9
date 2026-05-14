@@ -206,6 +206,13 @@ export function EditCompanyDialog({ company, open, onOpenChange, onSuccess }: Ed
         const discountPercentage = hasDiscount ? discountData.percentage : 0;
         const discountCycles = hasDiscount ? discountData.cycles : 0;
 
+        // Recalcular próxima cobrança a partir de hoje conforme nova periodicidade
+        const now = new Date();
+        const nextBilling = new Date(now);
+        if (billingPeriod === 'annual') nextBilling.setFullYear(now.getFullYear() + 1);
+        else if (billingPeriod === 'quarterly') nextBilling.setMonth(now.getMonth() + 3);
+        else nextBilling.setMonth(now.getMonth() + 1);
+
         if (subscription) {
           // Update existing subscription - apply immediately, clear pending changes
           const { error: subError } = await supabase
@@ -218,7 +225,8 @@ export function EditCompanyDialog({ company, open, onOpenChange, onSuccess }: Ed
               discount_cycles_remaining: discountCycles,
               pending_plan_change: null,
               status: 'active',
-              starts_at: new Date().toISOString(),
+              starts_at: now.toISOString(),
+              next_billing_date: nextBilling.toISOString(),
             })
             .eq('id', subscription.id);
             
@@ -234,7 +242,9 @@ export function EditCompanyDialog({ company, open, onOpenChange, onSuccess }: Ed
               original_price: originalPrice,
               discount_percentage: discountPercentage,
               discount_cycles_remaining: discountCycles,
-              status: 'active'
+              status: 'active',
+              starts_at: now.toISOString(),
+              next_billing_date: nextBilling.toISOString(),
             }]);
             
           if (subError) throw subError;

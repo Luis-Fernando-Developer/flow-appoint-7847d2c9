@@ -20,6 +20,8 @@ interface OnboardBody {
   province?: string;
   postal_code?: string;
   company_type?: string;
+  income_value?: number;
+  person_type?: "FISICA" | "JURIDICA";
 }
 
 Deno.serve(async (req) => {

@@ -68,6 +68,8 @@ export function EditCompanyDialog({ company, open, onOpenChange, onSuccess }: Ed
   const [descontoEspecial, setDescontoEspecial] = useState(false);
   const [selectedPlanId, setSelectedPlanId] = useState<string>("");
   const [billingPeriod, setBillingPeriod] = useState<string>("monthly");
+  const [availableCredits, setAvailableCredits] = useState(0);
+  const [creditsRefreshKey, setCreditsRefreshKey] = useState(0);
   
   const [formData, setFormData] = useState({
     name: "",

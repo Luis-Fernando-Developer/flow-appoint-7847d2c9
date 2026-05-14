@@ -1286,6 +1286,25 @@ export default function ClientBooking() {
       <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {renderStep()}
       </div>
+
+      {paymentDialog.open && paymentDialog.bookingId && company && (
+        <BookingPaymentDialog
+          open={paymentDialog.open}
+          onClose={() => setPaymentDialog({ open: false })}
+          bookingId={paymentDialog.bookingId}
+          companyId={company.id}
+          amount={paymentDialog.amount || 0}
+          payerInitial={{
+            name: client?.name || formData.client_name,
+            email: client?.email || formData.client_email,
+            phone: client?.phone || formData.client_phone,
+            cpf_cnpj: client?.cpf,
+          }}
+          allowPayLater={paymentDialog.allowLater}
+          onPayLater={() => { setPaymentDialog({ open: false }); setStep(6); }}
+          onPaid={() => { setPaymentDialog({ open: false }); setStep(6); }}
+        />
+      )}
     </div>
   );
 }

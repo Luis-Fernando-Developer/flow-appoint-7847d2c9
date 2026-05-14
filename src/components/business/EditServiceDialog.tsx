@@ -25,6 +25,7 @@ interface Service {
   duration_minutes: number;
   is_active: boolean;
   image_url?: string;
+  payment_required?: "always" | "optional" | "never";
 }
 
 interface EditServiceDialogProps {
@@ -42,6 +43,7 @@ export function EditServiceDialog({ service, onServiceUpdated }: EditServiceDial
     price: 0,
     duration_minutes: 60,
     is_active: true,
+    payment_required: "optional" as "always" | "optional" | "never",
   });
 
   useEffect(() => {
@@ -52,6 +54,7 @@ export function EditServiceDialog({ service, onServiceUpdated }: EditServiceDial
         price: service.price,
         duration_minutes: service.duration_minutes,
         is_active: service.is_active,
+        payment_required: (service.payment_required as any) || "optional",
       });
     }
   }, [open, service]);
@@ -69,6 +72,7 @@ export function EditServiceDialog({ service, onServiceUpdated }: EditServiceDial
           price: formData.price,
           duration_minutes: formData.duration_minutes,
           is_active: formData.is_active,
+          payment_required: formData.payment_required,
         })
         .eq("id", service.id);
 
@@ -152,6 +156,18 @@ export function EditServiceDialog({ service, onServiceUpdated }: EditServiceDial
                   required
                 />
               </div>
+            </div>
+            <div className="grid gap-2">
+              <Label>Pagamento online</Label>
+              <select
+                className="w-full border rounded-md h-9 px-2 bg-background"
+                value={formData.payment_required}
+                onChange={(e) => setFormData({ ...formData, payment_required: e.target.value as any })}
+              >
+                <option value="never">Nunca exigir (só presencial)</option>
+                <option value="optional">Opcional (cliente escolhe)</option>
+                <option value="always">Obrigatório antes de confirmar</option>
+              </select>
             </div>
             <div className="flex items-center justify-between">
               <Label htmlFor="edit-active">Serviço Ativo</Label>

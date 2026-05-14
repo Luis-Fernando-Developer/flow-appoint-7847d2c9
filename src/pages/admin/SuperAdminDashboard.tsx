@@ -337,7 +337,7 @@ export default function SuperAdminDashboard() {
                     </div>
                     <div className="text-center">
                       <p className="text-sm font-medium">Status</p>
-                      {getStatusBadge(company.status)}
+                      {getStatusBadge(company.status ?? 'active')}
                     </div>
                     <div className="text-center">
                       <p className="text-sm font-medium">Receita</p>

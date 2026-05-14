@@ -91,8 +91,9 @@ export function EditCompanyDialog({ company, open, onOpenChange, onSuccess }: Ed
     if (open && company) {
       fetchPlans();
       fetchSubscription();
+      fetchAvailableCredits();
     }
-  }, [open, company]);
+  }, [open, company, creditsRefreshKey]);
 
   // Update form data when company changes
   useEffect(() => {

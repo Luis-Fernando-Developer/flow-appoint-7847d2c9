@@ -358,20 +358,89 @@ export function EditCompanyDialog({ company, open, onOpenChange, onSuccess }: Ed
             />
           </div>
 
-          {/* Plan Selection */}
-          <div className="space-y-2">
-            <Label htmlFor="plan">Plano</Label>
-            <Select value={selectedPlanId} onValueChange={setSelectedPlanId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione um plano" />
-              </SelectTrigger>
-              <SelectContent className="bg-card border-primary/20">
-                {plans.map(plan => (
-                  <SelectItem key={plan.id} value={plan.id}>{plan.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          {/* Plan & Billing Period */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="plan">Plano</Label>
+              <Select value={selectedPlanId} onValueChange={setSelectedPlanId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um plano" />
+                </SelectTrigger>
+                <SelectContent className="bg-card border-primary/20">
+                  {plans.map(plan => (
+                    <SelectItem key={plan.id} value={plan.id}>{plan.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Período de Cobrança</Label>
+              <Select value={billingPeriod} onValueChange={setBillingPeriod}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-card border-primary/20">
+                  <SelectItem value="monthly">Mensal</SelectItem>
+                  <SelectItem value="quarterly">Trimestral</SelectItem>
+                  <SelectItem value="annual">Anual</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
+          {selectedPlanId && (
+            <p className="text-xs text-muted-foreground -mt-2">
+              Valor base ({getPeriodLabel(billingPeriod)}): {formatPrice(getCurrentPlanPrice())}. Alterações aplicam-se imediatamente.
+            </p>
+          )}
+
+          {/* Pending Plan Change (downgrade/upgrade scheduled) */}
+          {subscription?.pending_plan_change && (
+            <Card className="border-amber-500/40 bg-amber-500/5">
+              <CardContent className="pt-4 space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5" />
+                    <div className="space-y-1">
+                      <p className="font-semibold text-sm">Mudança de plano agendada</p>
+                      <p className="text-xs text-muted-foreground">
+                        Novo plano:{" "}
+                        <span className="font-medium text-foreground">
+                          {plans.find(p => p.id === subscription.pending_plan_change?.plan_id)?.name ?? subscription.pending_plan_change?.plan_id}
+                        </span>
+                        {subscription.pending_plan_change?.billing_period && (
+                          <> · {getPeriodLabel(subscription.pending_plan_change.billing_period)}</>
+                        )}
+                      </p>
+                      {subscription.pending_plan_change?.effective_date && (
+                        <p className="text-xs text-muted-foreground">
+                          Vigência: {new Date(subscription.pending_plan_change.effective_date).toLocaleDateString('pt-BR')}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      const { error } = await supabase
+                        .from('company_subscriptions')
+                        .update({ pending_plan_change: null })
+                        .eq('id', subscription.id);
+                      if (error) {
+                        toast({ title: "Erro", description: "Não foi possível cancelar.", variant: "destructive" });
+                      } else {
+                        toast({ title: "Mudança de plano cancelada" });
+                        setSubscription({ ...subscription, pending_plan_change: null });
+                      }
+                    }}
+                  >
+                    <X className="w-3 h-3 mr-1" /> Cancelar mudança
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Discount Special Section */}
           <Card className="border-primary/20 bg-card/50">
@@ -389,31 +458,12 @@ export function EditCompanyDialog({ company, open, onOpenChange, onSuccess }: Ed
 
               {descontoEspecial && selectedPlanId && (
                 <div className="space-y-4 pt-4 border-t border-primary/10">
-                  {/* Plan Info */}
                   <div className="bg-primary/5 p-3 rounded-lg">
                     <p className="text-sm text-muted-foreground">Plano Selecionado</p>
                     <p className="font-semibold text-lg">{getSelectedPlan()?.name}</p>
                     <p className="text-sm text-muted-foreground">
-                      Valor Base ({getPeriodLabel(discountData.billingPeriod)}): {formatPrice(getCurrentPlanPrice())}
+                      Valor Base ({getPeriodLabel(billingPeriod)}): {formatPrice(getCurrentPlanPrice())}
                     </p>
-                  </div>
-
-                  {/* Billing Period */}
-                  <div className="space-y-2">
-                    <Label>Período de Cobrança</Label>
-                    <Select 
-                      value={discountData.billingPeriod} 
-                      onValueChange={(value) => setDiscountData({ ...discountData, billingPeriod: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-card border-primary/20">
-                        <SelectItem value="monthly">Mensal</SelectItem>
-                        <SelectItem value="quarterly">Trimestral</SelectItem>
-                        <SelectItem value="annual">Anual</SelectItem>
-                      </SelectContent>
-                    </Select>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">

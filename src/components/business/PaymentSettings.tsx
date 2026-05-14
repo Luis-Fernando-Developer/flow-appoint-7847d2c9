@@ -151,13 +151,18 @@ export function PaymentSettings({ companyId }: Props) {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-between p-4 border rounded-lg">
+          <div className={`flex items-center justify-between p-4 border rounded-lg transition-colors ${enabled ? "border-primary/40 bg-primary/5" : ""}`}>
             <div className="flex items-start gap-3">
-              <Banknote className="w-5 h-5 text-muted-foreground mt-1" />
+              <Banknote className={`w-5 h-5 mt-1 ${enabled ? "text-primary" : "text-muted-foreground"}`} />
               <div>
-                <div className="font-medium">Aceitar pagamento online</div>
+                <div className="font-medium flex items-center gap-2">
+                  Aceitar pagamento online
+                  {enabled && <Badge variant="secondary" className="text-[10px]">Ativo</Badge>}
+                </div>
                 <p className="text-sm text-muted-foreground">
-                  Desligado: cliente apenas agenda e paga presencialmente.
+                  {enabled
+                    ? "Cliente pode pagar online no momento do agendamento usando seu gateway conectado."
+                    : "Cliente apenas agenda e paga presencialmente no estabelecimento."}
                 </p>
               </div>
             </div>
@@ -186,7 +191,11 @@ export function PaymentSettings({ companyId }: Props) {
                 <option value="asaas">Asaas</option>
                 <option value="mercadopago" disabled>Mercado Pago (em breve)</option>
                 <option value="stripe" disabled>Stripe (em breve)</option>
+                <option value="pagarme" disabled>Pagar.me (em breve)</option>
               </select>
+              <p className="text-xs text-muted-foreground mt-1">
+                No momento, apenas Asaas está disponível. Mais provedores chegando em breve.
+              </p>
             </div>
 
             <div>

@@ -207,16 +207,18 @@ export function EditCompanyDialog({ company, open, onOpenChange, onSuccess }: Ed
         const discountCycles = hasDiscount ? discountData.cycles : 0;
 
         if (subscription) {
-          // Update existing subscription
+          // Update existing subscription - apply immediately, clear pending changes
           const { error: subError } = await supabase
             .from('company_subscriptions')
             .update({
               plan_id: selectedPlanId,
-              billing_period: discountData.billingPeriod,
+              billing_period: billingPeriod,
               original_price: originalPrice,
               discount_percentage: discountPercentage,
               discount_cycles_remaining: discountCycles,
-              status: 'active'
+              pending_plan_change: null,
+              status: 'active',
+              starts_at: new Date().toISOString(),
             })
             .eq('id', subscription.id);
             
@@ -228,7 +230,7 @@ export function EditCompanyDialog({ company, open, onOpenChange, onSuccess }: Ed
             .insert([{
               company_id: company.id,
               plan_id: selectedPlanId,
-              billing_period: discountData.billingPeriod,
+              billing_period: billingPeriod,
               original_price: originalPrice,
               discount_percentage: discountPercentage,
               discount_cycles_remaining: discountCycles,

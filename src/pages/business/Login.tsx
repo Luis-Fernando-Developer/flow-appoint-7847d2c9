@@ -47,12 +47,20 @@ export default function BusinessLogin() {
           .single();
 
         if (employee) {
+          if (employee.company?.status === "pending_payment") {
+            toast({
+              title: "Pagamento pendente",
+              description: "Conclua o pagamento para liberar o acesso.",
+            });
+            await supabase.auth.signOut();
+            navigate(`/signup/aguardando/${employee.company.id}`);
+            return;
+          }
+
           toast({
             title: "Login realizado com sucesso!",
             description: `Bem-vindo ao painel de ${employee.company.name}`,
           });
-          
-          // Redirecionar para o dashboard da empresa
           navigate(`/${employee.company.slug}/admin/dashboard`);
         } else {
           toast({

@@ -1,135 +1,154 @@
 ## Objetivo
 
-Sincronizar o controle de planos entre **flow-appoint** (origem da assinatura) e **builder-flow-api** (consumidor embedado), de forma que:
-
-- Quando a empresa é criada/embedada via flow-appoint, o builder respeita o plano do flow-appoint.
-- Quando o builder é vendido standalone, ele continua usando seu próprio plano interno.
-- A chave de identificação é a flag `embed_source` já existente no builder.
-
-## Etapa 1 — Lado do Flow-Appoint (este projeto)
-
-### 1.1 Mapeamento de planos
-Adicionar coluna `builder_tier` em `subscription_plans`:
-- `starter` (default para Prata)
-- `pro` (Ouro)
-- `business` (Diamante)
-- `suspended` (usado quando status = paused/blocked)
-
-Migration popula o valor para os 3 planos já existentes.
-
-### 1.2 Edge function `sync-builder-plan`
-Nova função em `supabase/functions/sync-builder-plan/index.ts`:
-- Recebe `{ company_id }`.
-- Busca empresa + assinatura + plano + status.
-- Resolve o `tier` final:
-  - status `paused`/`blocked` → `suspended`
-  - senão → `subscription_plans.builder_tier`
-- Gera JWT HS256 com `EMBED_SHARED_SECRET` (mesmo padrão do `provision-talkmap`), claims: `iss=flow-appoint`, `aud=builder-flow-api`, `purpose=sync-plan`, `exp=60s`.
-- POST para `https://fwoescubnnagdvwasbjl.supabase.co/functions/v1/sync-embed-plan` com `{ company_id, slug, tier, source: "flow-appoint" }`.
-- Em sucesso atualiza `companies.builder_synced_at`.
-- Fire-and-forget; falha apenas loga.
-
-Configurar `[functions.sync-builder-plan] verify_jwt = false` no `config.toml`.
-
-### 1.3 Pontos de chamada no flow-appoint
-Disparar `sync-builder-plan` em:
-1. `provision-talkmap` (logo após criar a conta no builder, com tier inicial).
-2. `EditCompanyDialog` — após salvar plano/status.
-3. `PlansManagement` — não necessário (afeta o template, não a empresa).
-4. `SuperAdminDashboard` — qualquer alteração de status da empresa.
-5. (Opcional) cron diário de reconciliação.
-
-### 1.4 Banco
-- `subscription_plans.builder_tier text not null default 'starter'`
-- `companies.builder_synced_at timestamptz null`
+Tornar o botão "Gerenciar Plano" funcional na aba de Configurações da empresa, integrando ao Asaas como gateway. Cobrir: cobrança recorrente (cartão, débito automático, PIX), antecipação de fatura D-3, upgrade/downgrade com proration, troca de método de pagamento (último usado vira padrão), histórico/lista de faturas com download de PDF, e exibição de plano atual + limites.
 
 ---
 
-## Etapa 2 — Documento/Prompt para o Builder-Flow-API
+## Modelo de cobrança (decisões)
 
-Conteúdo a colar no chat do outro projeto:
+**Antecipação D-3:** cron diário consulta assinaturas cuja `next_billing_date` está em D+3 e cria a próxima cobrança no Asaas com `dueDate` igual ao dia da renovação. Cliente recebe PIX/boleto/cartão com 3 dias de antecedência. Cartão e débito automático são cobrados pelo Asaas no vencimento (sem ação manual). PIX exige ação do cliente — enviamos link/QR por e-mail.
 
-````text
-# Sincronização de Planos com Flow-Appoint (embed)
+**Upgrade (proration imediata):**
+- Calcula `valor_diferenca = (preço_novo − preço_atual) × dias_restantes ÷ dias_ciclo`
+- Cria cobrança avulsa no Asaas pelo valor proporcional, vencimento em 1 dia
+- Quando paga (ou se for cartão recorrente, cobrada na hora), troca o plano e mantém a `next_billing_date` original
+- Bloqueio: não permite upgrade se houver fatura vencida em aberto
 
-## Contexto
-O Flow-Appoint cria contas no builder via `provision-account` e marca o
-workspace com `embed_source = 'flow-appoint'`. A partir de agora, o plano
-desses workspaces é gerenciado pelo Flow-Appoint, não pela tabela de planos
-interna do builder. Workspaces standalone (`embed_source IS NULL`)
-continuam funcionando como hoje.
+**Downgrade (agendado):**
+- Marca `pending_plan_change = { plan_id, effective_at: next_billing_date }` na `company_subscriptions`
+- Plano atual permanece até o fim do ciclo
+- No D-3, cron gera a próxima fatura já com o novo plano e zera o `pending_plan_change`
+- Permite cancelar o downgrade antes do efetivo
 
-## Mudanças requeridas no builder-flow-api
-
-### 1. Schema
-Adicionar na tabela de workspace/conta:
-- `embed_plan_tier text` — valores: 'starter' | 'pro' | 'business' | 'suspended'
-- `embed_plan_synced_at timestamptz`
-- (já existe) `embed_source text`
-
-### 2. Nova edge function `sync-embed-plan`
-- POST autenticado via JWT HS256 assinado com `EMBED_SHARED_SECRET`
-  (mesmo secret usado no `provision-account`).
-- Claims esperadas: `iss=flow-appoint`, `aud=builder-flow-api`,
-  `purpose=sync-plan`, `exp` futuro.
-- Body: `{ company_id, slug, tier, source }`.
-- Localizar workspace pela combinação (`embed_source = source` AND
-  `embed_company_id = company_id`) — se não existir, criar log e responder 404.
-- Atualizar `embed_plan_tier` e `embed_plan_synced_at`.
-- Resposta: `{ ok: true }`.
-- Configurar `verify_jwt = false` (auth feita internamente).
-
-### 3. Resolução efetiva do plano
-Criar função `resolveEffectivePlan(workspace)`:
-- Se `embed_source = 'flow-appoint'`: usar `embed_plan_tier`.
-- Senão: usar plano interno (lógica atual).
-- Se tier = 'suspended': bloquear bots e edição, mas manter dados.
-
-Aplicar essa função em todos os pontos que hoje leem o plano interno
-(limites de bots, mensagens, integrações, gating de UI).
-
-### 4. Tabela de limites por tier (embed)
-| tier       | bots | msgs/mês | integrações | observação                    |
-|------------|------|----------|-------------|-------------------------------|
-| starter    | 1    | 1.000    | 2           | equivale ao plano Prata       |
-| pro        | 5    | 10.000   | 10          | equivale ao plano Ouro        |
-| business   | 20   | 50.000   | ilimitado   | equivale ao plano Diamante    |
-| suspended  | 0    | 0        | 0           | empresa pausada/bloqueada     |
-
-(Ajustar valores conforme regra de negócio definitiva.)
-
-### 5. UI
-Esconder a aba "Pagamento/Plano" quando `embed_source = 'flow-appoint'`
-(já existe). Adicionar badge "Plano gerenciado pelo Flow-Appoint" e link
-opcional para o painel da empresa lá.
-
-### 6. Endpoint opcional de auditoria
-`GET /embed/plan-status?company_id=...` (mesmo JWT) → retorna
-`{ tier, synced_at, source }`. Útil para reconciliação.
-
-## Contrato resumido
-- Source of truth do plano: Flow-Appoint.
-- Canal: edge function `sync-embed-plan` (push do flow-appoint).
-- Gatilhos: signup, mudança de plano, mudança de status, cron diário.
-- Kill switch: tier `suspended`.
-````
+**Por quê assim:** evita reembolso (downgrade) e maximiza receita justa (upgrade). Padrão Stripe/Chargebee.
 
 ---
 
-## Detalhes técnicos
+## Métodos de pagamento
 
-- **Secret compartilhado**: `EMBED_SHARED_SECRET` já existe nos dois projetos.
-- **URL builder**: `https://fwoescubnnagdvwasbjl.supabase.co/functions/v1/sync-embed-plan`.
-- **Idempotência**: a função no builder deve aceitar múltiplos sync com mesmo tier sem efeito colateral.
-- **Falhas**: o flow-appoint nunca bloqueia operação do usuário se o sync falhar — só loga e tenta de novo no próximo evento/cron.
-- **Mapeamento atual** (ajustável em `subscription_plans.builder_tier`):
-  Prata → starter, Ouro → pro, Diamante → business.
+Tabela `company_payment_methods`:
+- `type`: `credit_card` | `pix` | `bank_debit`
+- `asaas_token` (cartão tokenizado / mandato débito)
+- `last_digits`, `brand`, `bank_name` (display)
+- `is_default` (último usado = default automático)
+- Apenas 1 default por empresa (trigger)
 
-## Ordem de execução sugerida
+Fluxo:
+- **Cartão**: tokenização via Asaas Checkout (não armazenamos PAN). Renovação automática.
+- **Débito automático**: aceite + dados bancários via Asaas (mandato). Renovação automática.
+- **PIX**: não armazena nada; cada fatura gera novo QR. Default = "última usada", mas exige ação manual no vencimento.
 
-1. Migration: `builder_tier` em `subscription_plans` + `builder_synced_at` em `companies`.
-2. Edge function `sync-builder-plan` + entrada no `config.toml`.
-3. Chamada no `provision-talkmap` (após criar conta).
-4. Chamada no `EditCompanyDialog` (após `update`).
-5. Chamada nos pontos de mudança de status do super-admin.
-6. (Depois que o builder implementar `sync-embed-plan`) testar ponta a ponta.
+Após pagamento bem-sucedido, webhook do Asaas atualiza `is_default` para o método usado.
+
+---
+
+## Banco de dados (migrations)
+
+```sql
+-- assinatura: rastreio de ciclo e mudanças pendentes
+ALTER TABLE company_subscriptions ADD COLUMN
+  asaas_subscription_id text,
+  next_billing_date date,
+  pending_plan_change jsonb,
+  current_payment_method_id uuid;
+
+-- métodos de pagamento
+CREATE TABLE company_payment_methods (
+  id uuid PRIMARY KEY,
+  company_id uuid NOT NULL,
+  type text NOT NULL,           -- credit_card | pix | bank_debit
+  asaas_token text,
+  display_label text,           -- "Visa •••• 1234"
+  brand text, last_digits text, bank_name text,
+  is_default boolean DEFAULT false,
+  is_active boolean DEFAULT true,
+  created_at timestamptz DEFAULT now()
+);
+
+-- faturas (espelho das cobranças do Asaas, p/ relatório e PDF)
+CREATE TABLE company_invoices (
+  id uuid PRIMARY KEY,
+  company_id uuid NOT NULL,
+  subscription_id uuid,
+  asaas_charge_id text UNIQUE,
+  amount numeric NOT NULL,
+  status text NOT NULL,         -- pending | paid | overdue | refunded | cancelled
+  billing_type text,            -- CREDIT_CARD | PIX | DEBIT
+  due_date date NOT NULL,
+  paid_at timestamptz,
+  invoice_url text,             -- PDF do Asaas
+  pix_qr_code text,
+  description text,
+  created_at timestamptz DEFAULT now()
+);
+
+-- limites por tier (espelha o builder, mas centralizado aqui)
+CREATE TABLE plan_limits (
+  plan_id uuid PRIMARY KEY,
+  max_employees int, max_services int, max_bookings_month int,
+  max_chatbots int, max_chatbot_messages int, max_integrations int,
+  features jsonb
+);
+```
+
+Todas com RLS: SELECT público controlado por company, ALL apenas service_role (webhook + admin).
+
+---
+
+## Edge functions (Asaas)
+
+1. **`asaas-create-customer`** — cria/atualiza cliente Asaas a partir da company.
+2. **`asaas-create-subscription`** — cria assinatura recorrente quando empresa adere a um plano pago.
+3. **`asaas-change-plan`** — recebe `{ company_id, new_plan_id, action: 'upgrade'|'downgrade' }`, calcula proration e age de acordo.
+4. **`asaas-tokenize-card`** — proxy para Asaas Checkout / tokenização (retorna URL hospedada do Asaas).
+5. **`asaas-set-payment-method`** — define método ativo da próxima cobrança e marca como default.
+6. **`asaas-webhook`** (verify_jwt=false, valida `asaas-access-token` no header) — recebe eventos `PAYMENT_CONFIRMED`, `PAYMENT_RECEIVED`, `PAYMENT_OVERDUE`, `PAYMENT_REFUNDED`, atualiza `company_invoices`, marca método como default, sincroniza `next_billing_date`, e em caso de overdue dispara downgrade automático para `suspended` (que sincroniza com builder).
+7. **`asaas-billing-cron`** (cron diário 03:00) — varre subscriptions com `next_billing_date = hoje + 3 dias`, aplica `pending_plan_change` se houver, cria a próxima cobrança no Asaas.
+8. **`asaas-list-invoices`** — proxy autenticado que lista faturas da empresa com URL do PDF.
+
+Secret necessário: `ASAAS_API_KEY` + `ASAAS_WEBHOOK_TOKEN` + `ASAAS_ENV` (sandbox/prod).
+
+---
+
+## Frontend — Página `Gerenciar Plano`
+
+Rota: `/business/:slug/billing` (botão "Gerenciar Plano" em Settings.tsx aponta pra cá).
+
+Layout em abas:
+- **Plano Atual**: nome, preço, ciclo, próxima cobrança, limites (uso × máximo via `plan_limits`), badge se houver `pending_plan_change`. Botões "Mudar de plano" e "Cancelar assinatura".
+- **Mudar de plano**: lista todos os planos. Mostra preview de proration (upgrade) ou data efetiva (downgrade) antes de confirmar.
+- **Métodos de pagamento**: lista de cartões/débitos salvos + opção PIX. Botão "Adicionar cartão" abre Asaas Checkout em iframe/redirect. "Definir como padrão" e "Remover".
+- **Histórico de faturas**: tabela com data, valor, status (badge), método, ação "Baixar PDF" (abre `invoice_url` do Asaas) + "Pagar agora" se pendente (abre QR PIX ou cartão).
+
+---
+
+## Sincronia com builder-flow-api
+
+Já existe `syncBuilderPlan`. Adicionar gatilhos em:
+- Webhook do Asaas após `PAYMENT_CONFIRMED` de upgrade efetivado → sync (novo tier).
+- Webhook após `PAYMENT_OVERDUE` (3+ dias) → sync com `suspended`.
+- Cron de billing após aplicar `pending_plan_change` → sync (downgrade efetivado).
+
+---
+
+## Ordem de execução
+
+1. Migration (tabelas + colunas + RLS + plan_limits seed).
+2. Pedir secret `ASAAS_API_KEY` + `ASAAS_WEBHOOK_TOKEN`.
+3. Edge functions Asaas (create-customer, create-subscription, webhook, list-invoices).
+4. Página `BillingManagement.tsx` com aba Plano Atual + Faturas (somente leitura primeiro).
+5. Tokenização de cartão + métodos de pagamento.
+6. Mudança de plano com proration (upgrade/downgrade).
+7. Cron de antecipação D-3.
+8. Wire-up botão "Gerenciar Plano" em Settings.tsx + rota.
+
+---
+
+## Fora de escopo desta entrega
+
+- Emissão de NFS-e (fica para fase 2).
+- PDF customizado (usamos o do Asaas).
+- Pagamento de fatura avulsa fora do ciclo (não-renovação).
+- Multi-moeda.
+
+Se aprovar, começo pela migration + pedido do `ASAAS_API_KEY`.

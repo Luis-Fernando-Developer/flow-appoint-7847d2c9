@@ -1,9 +1,7 @@
-// Cria cobrança no Asaas para um agendamento usando a API key da própria empresa.
-// Modos suportados:
-// - own_gateway: usa key própria descriptografada da empresa
-// - none: erro (não permite gerar pagamento)
+// Cria cobrança no gateway próprio configurado pela empresa.
+// Provedores suportados: asaas, mercadopago, stripe, pagarme.
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { asaas, corsHeaders, findOrCreateClientCustomer, addDays } from "../_shared/asaas.ts";
+import { createCharge, corsHeaders, PROVIDER_METHODS, type Method, type Provider } from "../_shared/gateways.ts";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -12,13 +10,9 @@ const supabase = createClient(
 
 interface Body {
   booking_id: string;
-  method: "PIX" | "CREDIT_CARD" | "DEBIT_CARD" | "BOLETO";
-  payer: {
-    name: string;
-    email?: string;
-    phone?: string;
-    cpf_cnpj?: string;
-  };
+  method: Method;
+  payer: { name: string; email?: string; phone?: string; cpf_cnpj?: string };
+  return_url?: string;
 }
 
 Deno.serve(async (req) => {
@@ -44,9 +38,12 @@ Deno.serve(async (req) => {
       .eq("company_id", booking.company_id)
       .maybeSingle();
 
-    const mode = settings?.payment_mode || "none";
-    if (mode !== "own_gateway") {
-      return json({ error: "Empresa não aceita pagamento online" }, 400);
+    if (settings?.payment_mode !== "own_gateway") return json({ error: "Empresa não aceita pagamento online" }, 400);
+
+    const provider = (settings?.own_gateway_provider || "asaas").toLowerCase() as Provider;
+    if (!PROVIDER_METHODS[provider]) return json({ error: "Provedor inválido" }, 400);
+    if (!PROVIDER_METHODS[provider].includes(body.method)) {
+      return json({ error: `Método ${body.method} não suportado por ${provider}` }, 400);
     }
 
     const accepted = (settings?.accepted_methods || {}) as Record<string, boolean>;
@@ -55,17 +52,13 @@ Deno.serve(async (req) => {
       : body.method === "DEBIT_CARD" ? "debit_card" : "boleto";
     if (!accepted[methodKey]) return json({ error: "Método não aceito por esta empresa" }, 400);
 
-    if (!settings?.own_gateway_api_key_encrypted) {
-      return json({ error: "Empresa sem gateway configurado" }, 400);
-    }
+    if (!settings?.own_gateway_api_key_encrypted) return json({ error: "Empresa sem gateway configurado" }, 400);
 
-    // Decrypt API key via RPC
     const { data: decKey, error: decErr } = await supabase.rpc("decrypt_chatbot_key", {
       p_cipher: settings.own_gateway_api_key_encrypted,
       p_secret: "asaas-own-gateway",
     });
     if (decErr || !decKey) return json({ error: "Falha ao ler chave do gateway" }, 500);
-    const overrideKey = decKey as string;
 
     const { data: client } = await supabase
       .from("clients")
@@ -73,36 +66,20 @@ Deno.serve(async (req) => {
       .eq("id", booking.client_id)
       .maybeSingle();
 
-    const customerId = await findOrCreateClientCustomer({
-      clientId: client?.id || booking.client_id || "anon",
-      name: body.payer.name || client?.name || "Cliente",
-      email: body.payer.email || client?.email,
-      phone: body.payer.phone || client?.phone,
-      cpfCnpj: body.payer.cpf_cnpj || client?.cpf,
-    }, overrideKey);
-
-    const dueDate = addDays(new Date(), body.method === "BOLETO" ? 3 : 1);
-    const charge = await asaas<any>(`/payments`, {
-      method: "POST",
-      body: JSON.stringify({
-        customer: customerId,
-        billingType: body.method,
-        value: amount,
-        dueDate,
-        description: `${(booking as any).services?.name || "Serviço"} — ${(booking as any).companies?.name || ""}`,
-        externalReference: `booking:${booking.id}`,
-      }),
-    }, overrideKey);
-
-    let pixQr: string | null = null;
-    let pixPayload: string | null = null;
-    if (body.method === "PIX") {
-      try {
-        const qr = await asaas<any>(`/payments/${charge.id}/pixQrCode`, {}, overrideKey);
-        pixQr = qr.encodedImage ? `data:image/png;base64,${qr.encodedImage}` : null;
-        pixPayload = qr.payload || null;
-      } catch (_) { /* ignore */ }
-    }
+    const charge = await createCharge(provider, decKey as string, {
+      amount,
+      description: `${(booking as any).services?.name || "Serviço"} — ${(booking as any).companies?.name || ""}`,
+      externalReference: `booking:${booking.id}`,
+      method: body.method,
+      payer: {
+        name: body.payer.name || client?.name || "Cliente",
+        email: body.payer.email || client?.email || undefined,
+        phone: body.payer.phone || client?.phone || undefined,
+        cpf_cnpj: body.payer.cpf_cnpj || client?.cpf || undefined,
+      },
+      successUrl: body.return_url,
+      cancelUrl: body.return_url,
+    });
 
     const paymentRow = {
       booking_id: booking.id,
@@ -110,34 +87,32 @@ Deno.serve(async (req) => {
       amount,
       status: "pending",
       method: methodKey,
-      asaas_charge_id: charge.id,
-      invoice_url: charge.invoiceUrl || null,
-      bank_slip_url: charge.bankSlipUrl || null,
-      pix_qr_code: pixQr,
-      pix_payload: pixPayload,
+      asaas_charge_id: charge.externalId,
+      invoice_url: charge.invoice_url,
+      bank_slip_url: charge.bank_slip_url,
+      pix_qr_code: charge.pix_qr_code,
+      pix_payload: charge.pix_payload,
       platform_fee_amount: 0,
-      metadata: { mode, billingType: body.method },
+      metadata: { provider, billingType: body.method },
     };
 
     await supabase.from("booking_payments").delete().eq("booking_id", booking.id);
     const { error: insErr } = await supabase.from("booking_payments").insert(paymentRow);
     if (insErr) console.error("[booking-create-payment] insert error", insErr);
 
-    await supabase
-      .from("bookings")
-      .update({ payment_status: "pending" })
-      .eq("id", booking.id);
+    await supabase.from("bookings").update({ payment_status: "pending" }).eq("id", booking.id);
 
     return json({
       ok: true,
       payment: {
-        id: charge.id,
-        invoice_url: charge.invoiceUrl,
-        bank_slip_url: charge.bankSlipUrl,
-        pix_qr_code: pixQr,
-        pix_payload: pixPayload,
+        id: charge.externalId,
+        invoice_url: charge.invoice_url,
+        bank_slip_url: charge.bank_slip_url,
+        pix_qr_code: charge.pix_qr_code,
+        pix_payload: charge.pix_payload,
         amount,
         method: body.method,
+        provider,
       },
     });
   } catch (e: any) {
@@ -147,8 +122,5 @@ Deno.serve(async (req) => {
 });
 
 function json(b: unknown, status = 200) {
-  return new Response(JSON.stringify(b), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
+  return new Response(JSON.stringify(b), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }

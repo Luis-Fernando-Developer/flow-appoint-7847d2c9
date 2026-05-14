@@ -79,7 +79,11 @@ async function handlePayment(event: string, p: any) {
     status,
     billing_type: p.billingType || null,
     due_date: p.dueDate,
-    paid_at: p.paymentDate ? new Date(p.paymentDate).toISOString() : null,
+    paid_at: p.paymentDate
+      ? new Date(p.paymentDate).toISOString()
+      : status === "paid"
+        ? new Date().toISOString()
+        : null,
     invoice_url: p.invoiceUrl || null,
     bank_slip_url: p.bankSlipUrl || null,
     description: p.description || null,

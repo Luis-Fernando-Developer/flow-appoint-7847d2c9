@@ -46,6 +46,13 @@ Deno.serve(async (req) => {
 
 async function handlePayment(event: string, p: any) {
   const status = mapPaymentStatus(event, p.status);
+
+  // Route booking payments separately (externalReference = "booking:<uuid>")
+  const ext: string = p.externalReference || "";
+  if (ext.startsWith("booking:")) {
+    return handleBookingPayment(status, p, ext.slice("booking:".length));
+  }
+
   // Find invoice via asaas_charge_id
   const { data: existing } = await supabase
     .from("company_invoices")

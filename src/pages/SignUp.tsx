@@ -44,15 +44,24 @@ export default function SignUp() {
   const [billingPeriod, setBillingPeriod] = useState<"monthly" | "quarterly" | "annual">(
     periodParam as any
   );
+  const [billingType, setBillingType] = useState<"PIX" | "BOLETO" | "CREDIT_CARD">("PIX");
   const [formData, setFormData] = useState({
     companyName: "",
     customUrl: "",
     ownerName: "",
     ownerCpf: "",
     ownerMail: "",
+    ownerPhone: "",
     ownerPass: "",
     ownerPassRepeat: "",
     companyCnpj: "",
+    cardHolder: "",
+    cardNumber: "",
+    cardExpMonth: "",
+    cardExpYear: "",
+    cardCcv: "",
+    cardZip: "",
+    cardAddrNumber: "",
   });
   const [urlAvailable, setUrlAvailable] = useState<boolean | null>(null);
   const [isCheckingUrl, setIsCheckingUrl] = useState(false);
@@ -159,87 +168,72 @@ export default function SignUp() {
         setIsLoading(false);
         return;
       }
-      // Ruby = contato comercial
       if (selectedPlan.name === "Ruby") {
         toast({ title: "Plano Ruby", description: "Entre em contato para uma solução personalizada.", variant: "default" });
         setIsLoading(false);
         return;
       }
-
-      // 1. Criar empresa
-      const { data: companyData, error: companyError } = await supabase
-        .from("companies")
-        .insert([{ name: formData.companyName, slug: formData.customUrl, owner_name: formData.ownerName, owner_email: formData.ownerMail, status: "active" }])
-        .select()
-        .single();
-      if (companyError) throw companyError;
-
-      // 2. Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: formData.ownerMail,
-        password: formData.ownerPass,
-        options: {
-          emailRedirectTo: `${window.location.origin}/`,
-          data: { owner_name: formData.ownerName, company_id: companyData.id },
-        },
-      });
-      if (authError) throw authError;
-
-      // 3. Employee
-      const { error: employeeError } = await supabase
-        .from("employees")
-        .insert([{ company_id: companyData.id, user_id: authData.user?.id, name: formData.ownerName, email: formData.ownerMail, role: "owner", is_active: true }]);
-      if (employeeError) throw employeeError;
-
-      // 4. Chatbot integration stub
-      await supabase.from("chatbot_integration").insert([{
-        company_id: companyData.id,
-        builder_base_url: "https://talkbuilder.lovable.app",
-        builder_workspace_slug: formData.customUrl,
-        is_active: false,
-        talkmap_provisioned: false,
-      }]);
-
-      // 4.1 Provisionar no builder-flow-api com o plano mapeado
-      const builderPlan = PLAN_TO_BUILDER[selectedPlan.name] || "starter";
-      try {
-        const provisionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/provision-talkmap`;
-        const provRes = await fetch(provisionUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            email: formData.ownerMail,
-            password: formData.ownerPass,
-            slug: formData.customUrl,
-            display_name: formData.ownerName,
-            plan: builderPlan,
-            company_id: companyData.id,
-          }),
-        });
-        const provResult = await provRes.json();
-        if (provResult.ok) {
-          console.log("✅ Conta TalkMap provisionada:", provResult);
-        } else {
-          console.warn("⚠️ Falha ao provisionar TalkMap:", provResult.error);
-        }
-      } catch (provErr) {
-        console.warn("⚠️ Erro ao provisionar TalkMap (não bloqueante):", provErr);
+      if (!formData.ownerCpf || formData.ownerCpf.replace(/\D/g, "").length < 11) {
+        toast({ title: "CPF obrigatório", description: "Informe o CPF do empresário.", variant: "destructive" });
+        setIsLoading(false);
+        return;
       }
 
-      // 5. Subscription
-      await supabase.from("company_subscriptions").insert([{
-        company_id: companyData.id,
+      const cpfCnpj = (formData.companyCnpj || formData.ownerCpf).replace(/\D/g, "");
+
+      const payload: any = {
+        company: {
+          name: formData.companyName,
+          slug: formData.customUrl,
+          owner_name: formData.ownerName,
+          owner_email: formData.ownerMail,
+          owner_phone: formData.ownerPhone || null,
+          cpf_cnpj: cpfCnpj,
+          cnpj: formData.companyCnpj || null,
+        },
+        password: formData.ownerPass,
         plan_id: selectedPlan.id,
         billing_period: billingPeriod,
-        original_price: getPrice(selectedPlan),
-        status: "pending",
-      }]);
+        billing_type: billingType,
+      };
 
-      // 5.1 Sincronizar tier do plano com o builder-flow-api
-      syncBuilderPlan(companyData.id);
+      if (billingType === "CREDIT_CARD") {
+        if (!formData.cardNumber || !formData.cardCcv || !formData.cardExpMonth || !formData.cardExpYear) {
+          toast({ title: "Cartão incompleto", description: "Preencha todos os dados do cartão.", variant: "destructive" });
+          setIsLoading(false);
+          return;
+        }
+        payload.credit_card = {
+          holderName: formData.cardHolder || formData.ownerName,
+          number: formData.cardNumber.replace(/\s/g, ""),
+          expiryMonth: formData.cardExpMonth,
+          expiryYear: formData.cardExpYear,
+          ccv: formData.cardCcv,
+        };
+        payload.credit_card_holder_info = {
+          name: formData.ownerName,
+          email: formData.ownerMail,
+          cpfCnpj,
+          postalCode: formData.cardZip,
+          addressNumber: formData.cardAddrNumber || "S/N",
+          phone: (formData.ownerPhone || "").replace(/\D/g, ""),
+        };
+      }
 
-      toast({ title: "Cadastro realizado com sucesso!", description: `Sua empresa ${formData.companyName} foi cadastrada!` });
-      window.location.href = `/${formData.customUrl}/admin/login`;
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/signup-with-payment`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const result = await res.json();
+      if (!res.ok || !result?.ok) {
+        throw new Error(result?.error || "Falha no cadastro.");
+      }
+
+      toast({ title: "Cadastro criado!", description: "Conclua o pagamento para liberar o acesso." });
+      // Redirect to pending payment page
+      window.location.href = `/signup/aguardando/${result.company_id}`;
     } catch (error: any) {
       console.error("❌ Erro ao cadastrar:", error);
       toast({ title: "Erro ao cadastrar empresa", description: error?.message || "Tente novamente.", variant: "destructive" });

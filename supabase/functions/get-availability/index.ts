@@ -6,17 +6,20 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-interface AvailabilityRequest {
-  company_id: string;
-  service_id: string;
-  employee_id?: string;
-  date: string; // YYYY-MM-DD
-}
-
 interface TimeSlot {
   time: string;
   employee_id: string;
   employee_name: string;
+}
+
+function timeToMinutes(time: string): number {
+  const [h, m] = time.split(':').map(Number);
+  return h * 60 + m;
+}
+function minutesToTime(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
 }
 
 serve(async (req) => {
@@ -25,15 +28,13 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    );
 
-    // Support both GET and POST methods
-    let company_id: string;
-    let service_id: string;
+    let company_id: string, service_id: string, date: string;
     let employee_id: string | undefined;
-    let date: string;
 
     if (req.method === 'GET') {
       const url = new URL(req.url);
@@ -42,38 +43,35 @@ serve(async (req) => {
       employee_id = url.searchParams.get('employee_id') || undefined;
       date = url.searchParams.get('date') || '';
     } else {
-      const body = await req.json() as AvailabilityRequest;
+      const body = await req.json();
       company_id = body.company_id;
       service_id = body.service_id;
       employee_id = body.employee_id;
       date = body.date;
     }
 
-    console.log(`[get-availability] Method: ${req.method}, company_id: ${company_id}, service_id: ${service_id}, employee_id: ${employee_id}, date: ${date}`);
+    console.log(`[get-availability] company=${company_id} service=${service_id} employee=${employee_id} date=${date}`);
 
     if (!company_id || !service_id || !date) {
-      return new Response(
-        JSON.stringify({ error: 'Parâmetros obrigatórios: company_id, service_id, date' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: 'Parâmetros obrigatórios ausentes' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    const requestDate = new Date(date + 'T00:00:00');
+    const [yy, mm, dd] = date.split('-').map(Number);
+    const requestDate = new Date(yy, mm - 1, dd);
     const dayOfWeek = requestDate.getDay();
 
-    console.log(`[get-availability] Day of week: ${dayOfWeek}`);
-
-    // 1. Get company schedule settings
+    // Settings
     const { data: settings } = await supabase
       .from('company_schedule_settings')
       .select('*')
       .eq('company_id', company_id)
       .maybeSingle();
 
-    const slotDuration = settings?.slot_duration || 30;
-    const minAdvanceHours = settings?.min_booking_advance_hours || 1;
+    const slotDuration = settings?.slot_duration_minutes || 30;
+    const minAdvanceHours = settings?.min_advance_hours ?? 1;
 
-    // 2. Get business hours for this day
+    // Business hours
     const { data: businessHours } = await supabase
       .from('business_hours')
       .select('*')
@@ -81,270 +79,181 @@ serve(async (req) => {
       .eq('day_of_week', dayOfWeek)
       .maybeSingle();
 
-    console.log(`[get-availability] Business hours for day ${dayOfWeek}:`, businessHours);
-
-    // Check if business is open
     if (!businessHours || !businessHours.is_open) {
-      console.log('[get-availability] Business is closed on this day');
-      return new Response(
-        JSON.stringify({ slots: [], availability: [], message: 'Estabelecimento fechado neste dia' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ slots: [], availability: [], message: 'Estabelecimento fechado neste dia' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // 3. Check for company-wide blocked slots
-    const { data: companyBlocks } = await supabase
-      .from('blocked_slots')
-      .select('*')
-      .eq('company_id', company_id)
-      .eq('blocked_date', date)
-      .eq('is_company_wide', true);
-
-    if (companyBlocks && companyBlocks.some(b => !b.start_time)) {
-      console.log('[get-availability] Company-wide block for entire day');
-      return new Response(
-        JSON.stringify({ slots: [], availability: [], message: 'Data bloqueada' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // 4. Get service info
+    // Service
     const { data: service } = await supabase
       .from('services')
-      .select('duration_minutes')
+      .select('duration_minutes, duration')
       .eq('id', service_id)
       .single();
 
     if (!service) {
-      return new Response(
-        JSON.stringify({ error: 'Serviço não encontrado' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: 'Serviço não encontrado' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    const serviceDuration = service.duration_minutes;
+    const serviceDuration = service.duration_minutes || service.duration || 30;
 
-    // 5. Get employees for this service
+    // Employees linked to this service
     let employeeQuery = supabase
       .from('employees')
-      .select(`
-        id, 
-        name, 
-        employee_type,
-        employee_services!inner(service_id)
-      `)
+      .select('id, name, employee_services!inner(service_id)')
       .eq('company_id', company_id)
       .eq('is_active', true)
       .eq('employee_services.service_id', service_id);
 
-    if (employee_id) {
-      employeeQuery = employeeQuery.eq('id', employee_id);
-    }
+    if (employee_id) employeeQuery = employeeQuery.eq('id', employee_id);
 
-    const { data: employees } = await employeeQuery;
-
-    console.log(`[get-availability] Found ${employees?.length || 0} employees for this service`);
+    const { data: employees, error: empErr } = await employeeQuery;
+    if (empErr) console.error('[get-availability] emp error', empErr);
 
     if (!employees || employees.length === 0) {
-      console.log('[get-availability] No employees for this service');
-      return new Response(
-        JSON.stringify({ slots: [], availability: [], message: 'Nenhum profissional disponível para este serviço' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ slots: [], availability: [], message: 'Nenhum profissional disponível para este serviço' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
+
+    // Day boundaries for blocked_slots (datetime)
+    const dayStartIso = `${date}T00:00:00`;
+    const dayEndIso = `${date}T23:59:59`;
 
     const allSlots: TimeSlot[] = [];
     const availabilityByEmployee: { employee_id: string; employee_name: string; slots: string[] }[] = [];
 
     for (const employee of employees) {
-      console.log(`[get-availability] Processing employee: ${employee.name} (${employee.employee_type})`);
+      console.log(`[get-availability] processing ${employee.name}`);
 
-      const employeeSlots: string[] = [];
-
-      // 6. Check employee absences
+      // Absences (employee_absences or absences)
       const { data: absences } = await supabase
         .from('employee_absences')
-        .select('*')
+        .select('id')
         .eq('employee_id', employee.id)
         .lte('start_date', date)
         .gte('end_date', date);
+      if (absences && absences.length > 0) continue;
 
-      if (absences && absences.length > 0) {
-        console.log(`[get-availability] Employee ${employee.name} is absent`);
-        continue;
-      }
-
-      // 7. Get employee schedule based on type
+      // Try fixed schedule first
       let employeeStart: string | null = null;
       let employeeEnd: string | null = null;
       let breakStart: string | null = null;
       let breakEnd: string | null = null;
 
-      if (employee.employee_type === 'fixo') {
-        // Fixed employee - get weekly schedule
-        const { data: schedule } = await supabase
-          .from('employee_schedules')
-          .select('*')
-          .eq('employee_id', employee.id)
-          .eq('day_of_week', dayOfWeek)
-          .maybeSingle();
+      const { data: schedule } = await supabase
+        .from('employee_schedules')
+        .select('*')
+        .eq('employee_id', employee.id)
+        .eq('day_of_week', dayOfWeek)
+        .maybeSingle();
 
-        console.log(`[get-availability] Employee ${employee.name} schedule for day ${dayOfWeek}:`, schedule);
-
-        if (!schedule || !schedule.is_working) {
-          console.log(`[get-availability] Employee ${employee.name} doesn't work on this day`);
-          continue;
-        }
-
+      if (schedule && schedule.is_working && schedule.start_time && schedule.end_time) {
         employeeStart = schedule.start_time;
         employeeEnd = schedule.end_time;
         breakStart = schedule.break_start;
         breakEnd = schedule.break_end;
       } else {
-        // Autonomous - get availability for specific date
-        const { data: availability } = await supabase
+        // Autonomous availability fallback
+        const { data: avail } = await supabase
           .from('employee_availability')
           .select('*')
           .eq('employee_id', employee.id)
           .eq('available_date', date)
           .maybeSingle();
-
-        if (!availability) {
-          console.log(`[get-availability] Autonomous employee ${employee.name} has no availability for this date`);
+        if (!avail) {
+          console.log(`[get-availability] ${employee.name} no schedule/availability for ${date}`);
           continue;
         }
-
-        employeeStart = availability.start_time;
-        employeeEnd = availability.end_time;
-        breakStart = availability.break_start;
-        breakEnd = availability.break_end;
+        employeeStart = avail.start_time;
+        employeeEnd = avail.end_time;
+        breakStart = avail.break_start;
+        breakEnd = avail.break_end;
       }
 
-      if (!employeeStart || !employeeEnd) {
-        console.log(`[get-availability] Employee ${employee.name} has no start/end time configured`);
-        continue;
-      }
+      if (!employeeStart || !employeeEnd) continue;
 
-      console.log(`[get-availability] Employee ${employee.name} hours: ${employeeStart} - ${employeeEnd}, break: ${breakStart} - ${breakEnd}`);
-
-      // 8. Get employee-specific blocked slots
-      const { data: employeeBlocks } = await supabase
+      // Blocked slots for the day (employee or company-wide)
+      const { data: blocks } = await supabase
         .from('blocked_slots')
         .select('*')
-        .eq('employee_id', employee.id)
-        .eq('blocked_date', date);
+        .eq('company_id', company_id)
+        .gte('start_datetime', dayStartIso)
+        .lte('start_datetime', dayEndIso);
 
-      // Check if entire day is blocked
-      if (employeeBlocks && employeeBlocks.some(b => !b.start_time)) {
-        console.log(`[get-availability] Employee ${employee.name} has entire day blocked`);
-        continue;
-      }
+      const employeeBlocks = (blocks || []).filter(
+        (b: any) => !b.employee_id || b.employee_id === employee.id
+      );
 
-      // 9. Get existing bookings
+      // Existing bookings
       const { data: bookings } = await supabase
         .from('bookings')
-        .select('booking_time, duration_minutes')
+        .select('start_time, end_time, status')
         .eq('employee_id', employee.id)
         .eq('booking_date', date)
-        .in('booking_status', ['pending', 'confirmed']);
+        .in('status', ['pending', 'confirmed']);
 
-      // 10. Calculate available time range
-      // Intersect business hours with employee hours
       const businessOpen = businessHours.open_time || '08:00';
       const businessClose = businessHours.close_time || '18:00';
 
-      const effectiveStart = timeToMinutes(employeeStart) > timeToMinutes(businessOpen) 
-        ? employeeStart 
-        : businessOpen;
-      const effectiveEnd = timeToMinutes(employeeEnd) < timeToMinutes(businessClose) 
-        ? employeeEnd 
-        : businessClose;
+      const effectiveStart = timeToMinutes(employeeStart) > timeToMinutes(businessOpen)
+        ? employeeStart : businessOpen;
+      const effectiveEnd = timeToMinutes(employeeEnd) < timeToMinutes(businessClose)
+        ? employeeEnd : businessClose;
 
-      console.log(`[get-availability] Effective hours for ${employee.name}: ${effectiveStart} - ${effectiveEnd}`);
+      const startMin = timeToMinutes(effectiveStart);
+      const endMin = timeToMinutes(effectiveEnd);
 
-      // 11. Generate slots
-      const startMinutes = timeToMinutes(effectiveStart);
-      const endMinutes = timeToMinutes(effectiveEnd);
+      const employeeSlots: string[] = [];
 
-      for (let time = startMinutes; time + serviceDuration <= endMinutes; time += slotDuration) {
-        const slotTime = minutesToTime(time);
-        const slotEndTime = time + serviceDuration;
+      // Brazil now
+      const nowBr = new Date().toLocaleString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+      const [todayBr, timeBr] = nowBr.split(' ');
 
-        // Check minimum advance time for today (using Brazil timezone)
-        const nowBrazil = new Date().toLocaleString('sv-SE', { timeZone: 'America/Sao_Paulo' });
-        const [todayBrazil, timeBrazil] = nowBrazil.split(' ');
-        if (date === todayBrazil) {
-          const [hours, minutes] = timeBrazil.split(':').map(Number);
-          const nowMinutes = hours * 60 + minutes;
-          console.log(`[get-availability] Today check - Brazil time: ${timeBrazil}, slot: ${minutesToTime(time)}, min advance: ${minAdvanceHours}h`);
-          if (time < nowMinutes + (minAdvanceHours * 60)) {
-            continue;
-          }
+      for (let t = startMin; t + serviceDuration <= endMin; t += slotDuration) {
+        const slotEnd = t + serviceDuration;
+
+        if (date === todayBr) {
+          const [hh, mn] = timeBr.split(':').map(Number);
+          const nowMinutes = hh * 60 + mn;
+          if (t < nowMinutes + minAdvanceHours * 60) continue;
         }
 
-        // Check if slot overlaps with break
+        // Break
         if (breakStart && breakEnd) {
-          const breakStartMin = timeToMinutes(breakStart);
-          const breakEndMin = timeToMinutes(breakEnd);
-          if (time < breakEndMin && slotEndTime > breakStartMin) {
-            continue;
-          }
+          const bs = timeToMinutes(breakStart);
+          const be = timeToMinutes(breakEnd);
+          if (t < be && slotEnd > bs) continue;
         }
 
-        // Check if slot overlaps with blocked times
+        // Blocked slots overlap
         let isBlocked = false;
-        
-        // Company-wide blocks
-        for (const block of companyBlocks || []) {
-          if (block.start_time && block.end_time) {
-            const blockStart = timeToMinutes(block.start_time);
-            const blockEnd = timeToMinutes(block.end_time);
-            if (time < blockEnd && slotEndTime > blockStart) {
-              isBlocked = true;
-              break;
-            }
-          }
-        }
-
-        // Employee-specific blocks
-        if (!isBlocked) {
-          for (const block of employeeBlocks || []) {
-            if (block.start_time && block.end_time) {
-              const blockStart = timeToMinutes(block.start_time);
-              const blockEnd = timeToMinutes(block.end_time);
-              if (time < blockEnd && slotEndTime > blockStart) {
-                isBlocked = true;
-                break;
-              }
-            }
-          }
-        }
-
-        if (isBlocked) continue;
-
-        // Check if slot overlaps with existing bookings
-        let hasConflict = false;
-        for (const booking of bookings || []) {
-          const bookingStart = timeToMinutes(booking.booking_time);
-          const bookingEnd = bookingStart + booking.duration_minutes;
-          if (time < bookingEnd && slotEndTime > bookingStart) {
-            hasConflict = true;
+        for (const b of employeeBlocks) {
+          const bs = new Date(b.start_datetime);
+          const be = new Date(b.end_datetime);
+          const blockStartMin = bs.getHours() * 60 + bs.getMinutes();
+          const blockEndMin = be.getHours() * 60 + be.getMinutes();
+          if (t < blockEndMin && slotEnd > blockStartMin) {
+            isBlocked = true;
             break;
           }
         }
+        if (isBlocked) continue;
 
-        if (hasConflict) continue;
+        // Booking conflict
+        let conflict = false;
+        for (const bk of bookings || []) {
+          const bs = timeToMinutes(bk.start_time);
+          const be = timeToMinutes(bk.end_time);
+          if (t < be && slotEnd > bs) { conflict = true; break; }
+        }
+        if (conflict) continue;
 
-        // Slot is available!
+        const slotTime = minutesToTime(t);
         employeeSlots.push(slotTime);
-        allSlots.push({
-          time: slotTime,
-          employee_id: employee.id,
-          employee_name: employee.name,
-        });
+        allSlots.push({ time: slotTime, employee_id: employee.id, employee_name: employee.name });
       }
 
-      // Add to availability by employee
       if (employeeSlots.length > 0) {
         availabilityByEmployee.push({
           employee_id: employee.id,
@@ -354,36 +263,16 @@ serve(async (req) => {
       }
     }
 
-    // Sort slots by time
     allSlots.sort((a, b) => a.time.localeCompare(b.time));
 
-    console.log(`[get-availability] Found ${allSlots.length} total slots, ${availabilityByEmployee.length} employees with availability`);
-
     return new Response(
-      JSON.stringify({ 
-        slots: allSlots,
-        availability: availabilityByEmployee
-      }),
+      JSON.stringify({ slots: allSlots, availability: availabilityByEmployee }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-
   } catch (error: unknown) {
     console.error('[get-availability] Error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return new Response(
-      JSON.stringify({ error: errorMessage }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    const msg = error instanceof Error ? error.message : 'Unknown error';
+    return new Response(JSON.stringify({ error: msg }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 });
-
-function timeToMinutes(time: string): number {
-  const [hours, minutes] = time.split(':').map(Number);
-  return hours * 60 + minutes;
-}
-
-function minutesToTime(minutes: number): string {
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-  return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
-}

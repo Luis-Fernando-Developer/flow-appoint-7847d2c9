@@ -181,6 +181,37 @@ async function markDefaultByToken(companyId: string, token: string) {
   }
 }
 
+async function markDefaultByType(companyId: string, type: string) {
+  // Clear other defaults
+  await supabase
+    .from("company_payment_methods")
+    .update({ is_default: false })
+    .eq("company_id", companyId);
+  const { data } = await supabase
+    .from("company_payment_methods")
+    .select("id")
+    .eq("company_id", companyId)
+    .eq("type", type)
+    .eq("is_active", true)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (data?.id) {
+    await supabase
+      .from("company_payment_methods")
+      .update({ is_default: true })
+      .eq("id", data.id);
+  } else {
+    await supabase.from("company_payment_methods").insert([{
+      company_id: companyId,
+      type,
+      display_label: type === "PIX" ? "PIX" : "Boleto bancário",
+      is_default: true,
+      is_active: true,
+    }]);
+  }
+}
+
 function mapPaymentStatus(event: string, status: string): string {
   if (event === "PAYMENT_CONFIRMED" || event === "PAYMENT_RECEIVED") return "paid";
   if (event === "PAYMENT_OVERDUE") return "overdue";

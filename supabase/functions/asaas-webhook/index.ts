@@ -159,6 +159,22 @@ async function handlePayment(event: string, p: any) {
   }
 }
 
+async function handleBookingPayment(status: string, p: any, bookingId: string) {
+  const update: any = {
+    status,
+    paid_at: status === "paid" ? (p.paymentDate ? new Date(p.paymentDate).toISOString() : new Date().toISOString()) : null,
+    invoice_url: p.invoiceUrl || null,
+    bank_slip_url: p.bankSlipUrl || null,
+    metadata: p,
+  };
+  await supabase.from("booking_payments").update(update).eq("booking_id", bookingId);
+
+  // Sync booking.payment_status + auto-confirm if paid
+  const bookingUpdate: any = { payment_status: status };
+  if (status === "paid") bookingUpdate.status = "confirmed";
+  await supabase.from("bookings").update(bookingUpdate).eq("id", bookingId);
+}
+
 async function handleSubscription(event: string, s: any) {
   if (event === "SUBSCRIPTION_DELETED") {
     await supabase

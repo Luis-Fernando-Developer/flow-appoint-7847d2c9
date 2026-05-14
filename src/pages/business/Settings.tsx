@@ -8,10 +8,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Save, Building, Globe, Clock, Bell, Palette } from "lucide-react";
+import { Save, Building, Globe, Clock, Bell, Palette, Wallet } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
 import { LandingPageCustomizer } from "@/components/business/LandingPageCustomizer";
+import { PaymentSettings } from "@/components/business/PaymentSettings";
 
 interface Company {
   id: string;
@@ -332,6 +333,29 @@ export default function BusinessSettings() {
           className=" flex w-full flex-col "
           
         />
+
+        {/* Pagamentos */}
+        {canEditSettings && (
+          <Card className=" flex w-full flex-col ">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Wallet className="w-5 h-5" />
+                Pagamentos online
+              </CardTitle>
+              <CardDescription>
+                Configure como receber pagamentos dos clientes finais
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <PaymentSettings
+                companyId={company.id}
+                companyName={company.name}
+                ownerEmail={company.owner_email}
+                ownerPhone={company.owner_phone}
+              />
+            </CardContent>
+          </Card>
+        )}
 
         {/* Plano Atual */}
         <Card className=" flex w-full flex-col ">

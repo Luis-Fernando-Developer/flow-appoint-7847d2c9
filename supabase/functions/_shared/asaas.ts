@@ -1,5 +1,6 @@
 // Shared Asaas API helper for all edge functions.
 // Reads ASAAS_API_KEY and ASAAS_ENV from env.
+// Supports overriding the API key per-call (for subaccount or own-gateway flows).
 
 const ENV = (Deno.env.get("ASAAS_ENV") || "sandbox").toLowerCase();
 export const ASAAS_BASE =
@@ -7,17 +8,19 @@ export const ASAAS_BASE =
     ? "https://api.asaas.com/v3"
     : "https://api-sandbox.asaas.com/v3";
 
-const API_KEY = Deno.env.get("ASAAS_API_KEY") || "";
+const PLATFORM_API_KEY = Deno.env.get("ASAAS_API_KEY") || "";
 
 export async function asaas<T = any>(
   path: string,
   init: RequestInit = {},
+  overrideKey?: string,
 ): Promise<T> {
+  const key = overrideKey || PLATFORM_API_KEY;
   const res = await fetch(`${ASAAS_BASE}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
-      access_token: API_KEY,
+      access_token: key,
       "User-Agent": "FlowAppoint/1.0",
       ...(init.headers || {}),
     },
@@ -56,17 +59,16 @@ export async function findOrCreateCustomer(opts: {
   email?: string | null;
   phone?: string | null;
   cpfCnpj?: string | null;
-}): Promise<string> {
-  // Try to find by externalReference
+}, overrideKey?: string): Promise<string> {
   const search = await asaas<{ data: any[] }>(
     `/customers?externalReference=${encodeURIComponent(opts.companyId)}&limit=1`,
+    {},
+    overrideKey,
   );
   if (search?.data?.[0]?.id) return search.data[0].id;
 
   if (!opts.cpfCnpj) {
-    throw new Error(
-      "CPF/CNPJ obrigatório para criar cliente no gateway na primeira vez.",
-    );
+    throw new Error("CPF/CNPJ obrigatório para criar cliente no gateway na primeira vez.");
   }
 
   const created = await asaas<{ id: string }>(`/customers`, {
@@ -79,7 +81,40 @@ export async function findOrCreateCustomer(opts: {
       externalReference: opts.companyId,
       notificationDisabled: false,
     }),
-  });
+  }, overrideKey);
+  return created.id;
+}
+
+/**
+ * Find or create a customer specifically for an end-client (booking payer).
+ * Uses client.id as externalReference to avoid colliding with company customers.
+ */
+export async function findOrCreateClientCustomer(opts: {
+  clientId: string;
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  cpfCnpj?: string | null;
+}, overrideKey?: string): Promise<string> {
+  const ref = `client:${opts.clientId}`;
+  const search = await asaas<{ data: any[] }>(
+    `/customers?externalReference=${encodeURIComponent(ref)}&limit=1`,
+    {},
+    overrideKey,
+  );
+  if (search?.data?.[0]?.id) return search.data[0].id;
+
+  const created = await asaas<{ id: string }>(`/customers`, {
+    method: "POST",
+    body: JSON.stringify({
+      name: opts.name,
+      email: opts.email || undefined,
+      mobilePhone: opts.phone || undefined,
+      cpfCnpj: opts.cpfCnpj || undefined,
+      externalReference: ref,
+      notificationDisabled: false,
+    }),
+  }, overrideKey);
   return created.id;
 }
 

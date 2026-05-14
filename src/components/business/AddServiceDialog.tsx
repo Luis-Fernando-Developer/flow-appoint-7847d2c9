@@ -24,7 +24,8 @@ export function AddServiceDialog({ companyId, onServiceAdded }: AddServiceDialog
     description: "",
     price: "",
     duration_minutes: "60",
-    is_active: true
+    is_active: true,
+    payment_required: "optional" as "always" | "optional" | "never"
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -40,7 +41,8 @@ export function AddServiceDialog({ companyId, onServiceAdded }: AddServiceDialog
           description: formData.description,
           price: parseFloat(formData.price),
           duration_minutes: parseInt(formData.duration_minutes),
-          is_active: formData.is_active
+          is_active: formData.is_active,
+          payment_required: formData.payment_required
         }]);
 
       if (error) throw error;
@@ -50,13 +52,13 @@ export function AddServiceDialog({ companyId, onServiceAdded }: AddServiceDialog
         description: "O serviço foi adicionado com sucesso.",
       });
 
-      // Resetar formulário
       setFormData({
         name: "",
         description: "",
         price: "",
         duration_minutes: "60",
-        is_active: true
+        is_active: true,
+        payment_required: "optional"
       });
 
       setOpen(false);
@@ -137,6 +139,19 @@ export function AddServiceDialog({ companyId, onServiceAdded }: AddServiceDialog
                 required
               />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Pagamento online</Label>
+            <select
+              className="w-full border rounded-md h-9 px-2 bg-background"
+              value={formData.payment_required}
+              onChange={(e) => setFormData(prev => ({ ...prev, payment_required: e.target.value as any }))}
+            >
+              <option value="never">Nunca exigir (só presencial)</option>
+              <option value="optional">Opcional (cliente escolhe)</option>
+              <option value="always">Obrigatório antes de confirmar</option>
+            </select>
           </div>
 
           <div className="flex items-center space-x-2">

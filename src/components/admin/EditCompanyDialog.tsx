@@ -221,6 +221,8 @@ export function EditCompanyDialog({ company, open, onOpenChange, onSuccess }: Ed
       now: new Date(),
     });
   })();
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!company) return;
 

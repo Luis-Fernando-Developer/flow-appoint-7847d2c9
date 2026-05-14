@@ -294,7 +294,52 @@ export function EditCompanyDialog({ company, open, onOpenChange, onSuccess }: Ed
             
           if (subError) throw subError;
         }
+
+        // Aplicar proporção: gerar crédito (downgrade) ou consumir crédito (upgrade)
+        if (proration) {
+          const expiresAt = new Date();
+          expiresAt.setMonth(expiresAt.getMonth() + 12);
+
+          if (proration.creditGenerated > 0) {
+            await supabase.from("company_credits").insert([{
+              company_id: company.id,
+              amount: proration.creditGenerated,
+              original_amount: proration.creditGenerated,
+              reason: `Crédito proporcional gerado em mudança de plano via painel super admin (${proration.details.daysRemaining} dias restantes)`,
+              source: "admin_change",
+              status: "active",
+              source_subscription_id: subscription?.id ?? null,
+              expires_at: expiresAt.toISOString(),
+            }]);
+          }
+
+          if (proration.creditsConsumed > 0) {
+            const { data: activeCredits } = await supabase
+              .from("company_credits")
+              .select("*")
+              .eq("company_id", company.id)
+              .eq("status", "active")
+              .order("expires_at", { ascending: true });
+            let remaining = proration.creditsConsumed;
+            for (const c of (activeCredits as any[]) || []) {
+              if (remaining <= 0) break;
+              const used = Math.min(Number(c.amount), remaining);
+              const newAmount = Number(c.amount) - used;
+              await supabase
+                .from("company_credits")
+                .update({
+                  amount: newAmount,
+                  status: newAmount <= 0.01 ? "used" : "active",
+                  used_at: newAmount <= 0.01 ? new Date().toISOString() : null,
+                })
+                .eq("id", c.id);
+              remaining -= used;
+            }
+          }
+          setCreditsRefreshKey((k) => k + 1);
+        }
       }
+
 
       toast({
         title: "Empresa atualizada",

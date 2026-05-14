@@ -98,10 +98,29 @@ async function handlePayment(event: string, p: any) {
 
   // Side effects
   if (status === "paid") {
-    // Mark payment method as default if we have a token
+    // Activate company on first confirmed payment
+    await supabase
+      .from("companies")
+      .update({ status: "active" })
+      .eq("id", companyId)
+      .eq("status", "pending_payment");
+
+    // Activate the subscription if it was pending
+    if (subscriptionId) {
+      await supabase
+        .from("company_subscriptions")
+        .update({ status: "active" })
+        .eq("id", subscriptionId)
+        .in("status", ["pending_payment", "pending", "past_due"]);
+    }
+
+    // Mark payment method as default — by token (card) or by billing_type
     if (p.creditCard?.creditCardToken) {
       await markDefaultByToken(companyId, p.creditCard.creditCardToken);
+    } else if (p.billingType === "PIX" || p.billingType === "BOLETO") {
+      await markDefaultByType(companyId, p.billingType);
     }
+
     // Apply pending plan change
     if (subscriptionId) {
       const { data: sub } = await supabase
@@ -159,6 +178,37 @@ async function markDefaultByToken(companyId: string, token: string) {
       .from("company_payment_methods")
       .update({ is_default: true })
       .eq("id", data.id);
+  }
+}
+
+async function markDefaultByType(companyId: string, type: string) {
+  // Clear other defaults
+  await supabase
+    .from("company_payment_methods")
+    .update({ is_default: false })
+    .eq("company_id", companyId);
+  const { data } = await supabase
+    .from("company_payment_methods")
+    .select("id")
+    .eq("company_id", companyId)
+    .eq("type", type)
+    .eq("is_active", true)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (data?.id) {
+    await supabase
+      .from("company_payment_methods")
+      .update({ is_default: true })
+      .eq("id", data.id);
+  } else {
+    await supabase.from("company_payment_methods").insert([{
+      company_id: companyId,
+      type,
+      display_label: type === "PIX" ? "PIX" : "Boleto bancário",
+      is_default: true,
+      is_active: true,
+    }]);
   }
 }
 

@@ -55,9 +55,9 @@ const App = () => (
             {/* rota admin do sistema */}
             <Route path="/super-admin/login" element={<AdminLogin />} />
             {/* rota painel admin super admin */}
-            <Route path="/super-admin/painel" element={<SuperAdminDashboard />} />
+            <Route path="/super-admin/painel" element={<RequireSuperAdmin><SuperAdminDashboard /></RequireSuperAdmin>} />
             {/* rota para criar/adicionar empresa via painel super admin */}
-            <Route path="/super-admin/add-company" element={<CreateCompany />} />
+            <Route path="/super-admin/add-company" element={<RequireSuperAdmin><CreateCompany /></RequireSuperAdmin>} />
 
             {/* rotas protegidas do painel admin empresa */}
             <Route path="/:slug/admin/dashboard" element={<RequireBusinessAuth><BusinessDashboard /></RequireBusinessAuth>} />

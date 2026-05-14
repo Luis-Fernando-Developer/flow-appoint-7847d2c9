@@ -200,8 +200,19 @@ Deno.serve(async (req) => {
         creditGenerated: proration.creditGenerated,
       });
     }
+  } catch (e: any) {
+    console.error(e);
+    return json({ error: e.message }, 500);
+  }
+});
 
-function priceForPeriod(plan: any, period: string): number {
+async function getCustomerId(companyId: string): Promise<string | null> {
+  const r = await asaas<{ data: any[] }>(
+    `/customers?externalReference=${encodeURIComponent(companyId)}&limit=1`,
+  );
+  return r?.data?.[0]?.id || null;
+}
+
   if (period === "annual") return Number(plan.annual_price);
   if (period === "quarterly") return Number(plan.quarterly_price);
   return Number(plan.monthly_price);

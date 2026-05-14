@@ -24,6 +24,8 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabaseClient";
 import { getEdgeFunctionUrl } from "@/lib/supabaseHelpers";
 
+import { BookingPaymentDialog } from "@/components/booking/BookingPaymentDialog";
+
 interface Service {
   id: string;
   name: string;
@@ -31,6 +33,7 @@ interface Service {
   price: number;
   duration_minutes: number;
   image_url?: string;
+  payment_required?: "always" | "optional" | "never";
 }
 
 interface Employee {
@@ -82,6 +85,7 @@ export default function ClientBooking() {
   const [client, setClient] = useState<any>(null);
   const [customization, setCustomization] = useState<any>(null);
   const [pendingEmployeeRestore, setPendingEmployeeRestore] = useState<string | null>(null);
+  const [paymentDialog, setPaymentDialog] = useState<{ open: boolean; bookingId?: string; amount?: number; allowLater?: boolean }>({ open: false });
 
   useEffect(() => {
     fetchCompanyAndServices();
@@ -670,6 +674,33 @@ export default function ClientBooking() {
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Erro ao criar agendamento');
+      }
+
+      const result = await response.json();
+      const newBookingId = result?.booking?.id;
+      const isComboFlow = isCombo;
+
+      // Decide se abre o diálogo de pagamento
+      const paymentRule = selectedService.payment_required || "optional";
+      const needsPayment = !isComboFlow && newBookingId && paymentRule !== "never";
+
+      if (needsPayment) {
+        // Verifica se a empresa aceita pagamento online
+        const { data: settings } = await supabase
+          .from("company_payment_settings")
+          .select("payment_mode")
+          .eq("company_id", company.id)
+          .maybeSingle();
+        const enabled = settings && settings.payment_mode !== "none";
+        if (enabled) {
+          setPaymentDialog({
+            open: true,
+            bookingId: newBookingId,
+            amount: selectedService.price,
+            allowLater: paymentRule === "optional",
+          });
+          return;
+        }
       }
 
       setStep(6);

@@ -17,7 +17,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { supabase } from "@/lib/supabaseClient";
 import { syncBuilderPlan } from "@/lib/syncBuilderPlan";
 import { useToast } from "@/hooks/use-toast";
-import { Calculator, Percent, AlertTriangle, X } from "lucide-react";
+import { Calculator, Percent, AlertTriangle, X, ArrowUpCircle, ArrowDownCircle } from "lucide-react";
+import { calculateProration, type BillingPeriod, formatBRL } from "@/lib/proration";
+import { CompanyCreditsPanel } from "./CompanyCreditsPanel";
 
 // Aligned with database schema - companies table
 interface Company {

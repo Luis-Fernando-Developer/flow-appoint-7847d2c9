@@ -691,6 +691,117 @@ export type Database = {
           },
         ]
       }
+      company_invoices: {
+        Row: {
+          amount: number
+          asaas_charge_id: string | null
+          bank_slip_url: string | null
+          billing_type: string | null
+          company_id: string
+          created_at: string
+          description: string | null
+          due_date: string
+          id: string
+          invoice_url: string | null
+          metadata: Json | null
+          paid_at: string | null
+          payment_method_id: string | null
+          pix_payload: string | null
+          pix_qr_code: string | null
+          status: string
+          subscription_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          asaas_charge_id?: string | null
+          bank_slip_url?: string | null
+          billing_type?: string | null
+          company_id: string
+          created_at?: string
+          description?: string | null
+          due_date: string
+          id?: string
+          invoice_url?: string | null
+          metadata?: Json | null
+          paid_at?: string | null
+          payment_method_id?: string | null
+          pix_payload?: string | null
+          pix_qr_code?: string | null
+          status?: string
+          subscription_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          asaas_charge_id?: string | null
+          bank_slip_url?: string | null
+          billing_type?: string | null
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          due_date?: string
+          id?: string
+          invoice_url?: string | null
+          metadata?: Json | null
+          paid_at?: string | null
+          payment_method_id?: string | null
+          pix_payload?: string | null
+          pix_qr_code?: string | null
+          status?: string
+          subscription_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      company_payment_methods: {
+        Row: {
+          asaas_customer_id: string | null
+          asaas_token: string | null
+          bank_name: string | null
+          brand: string | null
+          company_id: string
+          created_at: string
+          display_label: string | null
+          id: string
+          is_active: boolean
+          is_default: boolean
+          last_digits: string | null
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          asaas_customer_id?: string | null
+          asaas_token?: string | null
+          bank_name?: string | null
+          brand?: string | null
+          company_id: string
+          created_at?: string
+          display_label?: string | null
+          id?: string
+          is_active?: boolean
+          is_default?: boolean
+          last_digits?: string | null
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          asaas_customer_id?: string | null
+          asaas_token?: string | null
+          bank_name?: string | null
+          brand?: string | null
+          company_id?: string
+          created_at?: string
+          display_label?: string | null
+          id?: string
+          is_active?: boolean
+          is_default?: boolean
+          last_digits?: string | null
+          type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       company_schedule_settings: {
         Row: {
           allow_simultaneous_breaks: boolean | null
@@ -737,45 +848,57 @@ export type Database = {
       }
       company_subscriptions: {
         Row: {
+          asaas_subscription_id: string | null
           billing_period: string
           company_id: string
           created_at: string
+          current_payment_method_id: string | null
           discount_cycles_remaining: number | null
           discount_percentage: number | null
           discount_reason: string | null
           ends_at: string | null
           id: string
+          next_billing_date: string | null
           original_price: number
+          pending_plan_change: Json | null
           plan_id: string
           starts_at: string | null
           status: string | null
           updated_at: string
         }
         Insert: {
+          asaas_subscription_id?: string | null
           billing_period?: string
           company_id: string
           created_at?: string
+          current_payment_method_id?: string | null
           discount_cycles_remaining?: number | null
           discount_percentage?: number | null
           discount_reason?: string | null
           ends_at?: string | null
           id?: string
+          next_billing_date?: string | null
           original_price?: number
+          pending_plan_change?: Json | null
           plan_id: string
           starts_at?: string | null
           status?: string | null
           updated_at?: string
         }
         Update: {
+          asaas_subscription_id?: string | null
           billing_period?: string
           company_id?: string
           created_at?: string
+          current_payment_method_id?: string | null
           discount_cycles_remaining?: number | null
           discount_percentage?: number | null
           discount_reason?: string | null
           ends_at?: string | null
           id?: string
+          next_billing_date?: string | null
           original_price?: number
+          pending_plan_change?: Json | null
           plan_id?: string
           starts_at?: string | null
           status?: string | null
@@ -1036,6 +1159,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      plan_limits: {
+        Row: {
+          created_at: string
+          features: Json
+          max_bookings_month: number | null
+          max_chatbot_messages: number | null
+          max_chatbots: number | null
+          max_employees: number | null
+          max_integrations: number | null
+          max_services: number | null
+          plan_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          features?: Json
+          max_bookings_month?: number | null
+          max_chatbot_messages?: number | null
+          max_chatbots?: number | null
+          max_employees?: number | null
+          max_integrations?: number | null
+          max_services?: number | null
+          plan_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          features?: Json
+          max_bookings_month?: number | null
+          max_chatbot_messages?: number | null
+          max_chatbots?: number | null
+          max_employees?: number | null
+          max_integrations?: number | null
+          max_services?: number | null
+          plan_id?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       rewards: {
         Row: {

@@ -814,48 +814,6 @@ export type Database = {
         }
         Relationships: []
       }
-      company_payment_accounts: {
-        Row: {
-          asaas_api_key_encrypted: string | null
-          asaas_subaccount_id: string | null
-          asaas_wallet_id: string | null
-          bank_data: Json | null
-          company_id: string
-          cpf_cnpj: string | null
-          created_at: string
-          id: string
-          onboarding_data: Json | null
-          status: string
-          updated_at: string
-        }
-        Insert: {
-          asaas_api_key_encrypted?: string | null
-          asaas_subaccount_id?: string | null
-          asaas_wallet_id?: string | null
-          bank_data?: Json | null
-          company_id: string
-          cpf_cnpj?: string | null
-          created_at?: string
-          id?: string
-          onboarding_data?: Json | null
-          status?: string
-          updated_at?: string
-        }
-        Update: {
-          asaas_api_key_encrypted?: string | null
-          asaas_subaccount_id?: string | null
-          asaas_wallet_id?: string | null
-          bank_data?: Json | null
-          company_id?: string
-          cpf_cnpj?: string | null
-          created_at?: string
-          id?: string
-          onboarding_data?: Json | null
-          status?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
       company_payment_methods: {
         Row: {
           asaas_customer_id: string | null
@@ -912,7 +870,6 @@ export type Database = {
           own_gateway_api_key_encrypted: string | null
           own_gateway_provider: string | null
           payment_mode: string
-          platform_fee_percentage: number
           updated_at: string
         }
         Insert: {
@@ -922,7 +879,6 @@ export type Database = {
           own_gateway_api_key_encrypted?: string | null
           own_gateway_provider?: string | null
           payment_mode?: string
-          platform_fee_percentage?: number
           updated_at?: string
         }
         Update: {
@@ -932,7 +888,6 @@ export type Database = {
           own_gateway_api_key_encrypted?: string | null
           own_gateway_provider?: string | null
           payment_mode?: string
-          platform_fee_percentage?: number
           updated_at?: string
         }
         Relationships: []

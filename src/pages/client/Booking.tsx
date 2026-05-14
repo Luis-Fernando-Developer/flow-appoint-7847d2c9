@@ -33,7 +33,7 @@ interface Service {
   price: number;
   duration_minutes: number;
   image_url?: string;
-  payment_required?: "always" | "optional" | "never";
+  payment_required?: string;
 }
 
 interface Employee {

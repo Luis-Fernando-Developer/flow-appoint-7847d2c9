@@ -14,3 +14,9 @@ verify_jwt = false
 
 [functions.sync-builder-plan]
 verify_jwt = false
+
+[functions.asaas-webhook]
+verify_jwt = false
+
+[functions.asaas-billing-cron]
+verify_jwt = false

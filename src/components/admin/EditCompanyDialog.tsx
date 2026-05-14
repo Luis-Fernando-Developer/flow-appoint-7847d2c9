@@ -17,7 +17,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { supabase } from "@/lib/supabaseClient";
 import { syncBuilderPlan } from "@/lib/syncBuilderPlan";
 import { useToast } from "@/hooks/use-toast";
-import { Calculator, Percent, AlertTriangle, X } from "lucide-react";
+import { Calculator, Percent, AlertTriangle, X, ArrowUpCircle, ArrowDownCircle } from "lucide-react";
+import { calculateProration, type BillingPeriod, formatBRL } from "@/lib/proration";
+import { CompanyCreditsPanel } from "./CompanyCreditsPanel";
 
 // Aligned with database schema - companies table
 interface Company {
@@ -47,6 +49,8 @@ interface Subscription {
   discount_percentage: number;
   discount_cycles_remaining: number;
   pending_plan_change: any;
+  starts_at: string | null;
+  next_billing_date: string | null;
 }
 
 interface EditCompanyDialogProps {
@@ -64,6 +68,8 @@ export function EditCompanyDialog({ company, open, onOpenChange, onSuccess }: Ed
   const [descontoEspecial, setDescontoEspecial] = useState(false);
   const [selectedPlanId, setSelectedPlanId] = useState<string>("");
   const [billingPeriod, setBillingPeriod] = useState<string>("monthly");
+  const [availableCredits, setAvailableCredits] = useState(0);
+  const [creditsRefreshKey, setCreditsRefreshKey] = useState(0);
   
   const [formData, setFormData] = useState({
     name: "",
@@ -85,8 +91,9 @@ export function EditCompanyDialog({ company, open, onOpenChange, onSuccess }: Ed
     if (open && company) {
       fetchPlans();
       fetchSubscription();
+      fetchAvailableCredits();
     }
-  }, [open, company]);
+  }, [open, company, creditsRefreshKey]);
 
   // Update form data when company changes
   useEffect(() => {
@@ -110,6 +117,24 @@ export function EditCompanyDialog({ company, open, onOpenChange, onSuccess }: Ed
       .eq('is_active', true);
     
     if (data) setPlans(data);
+  };
+
+  const fetchAvailableCredits = async () => {
+    if (!company) return;
+    // Lazy expiration
+    await supabase
+      .from("company_credits")
+      .update({ status: "expired" })
+      .eq("company_id", company.id)
+      .eq("status", "active")
+      .lt("expires_at", new Date().toISOString());
+    const { data } = await supabase
+      .from("company_credits")
+      .select("amount")
+      .eq("company_id", company.id)
+      .eq("status", "active");
+    const total = (data || []).reduce((s: number, r: any) => s + Number(r.amount || 0), 0);
+    setAvailableCredits(total);
   };
 
   const fetchSubscription = async () => {
@@ -176,6 +201,26 @@ export function EditCompanyDialog({ company, open, onOpenChange, onSuccess }: Ed
         return 'Mensal';
     }
   };
+
+  // Cálculo de proporção em tempo real (apenas se já existe subscription).
+  const proration = (() => {
+    if (!subscription || !selectedPlanId) return null;
+    const planChanged = subscription.plan_id !== selectedPlanId || subscription.billing_period !== billingPeriod;
+    if (!planChanged) return null;
+    const newValue = getCurrentPlanPrice();
+    const cycleStart = subscription.starts_at ? new Date(subscription.starts_at) : new Date();
+    const cycleEnd = subscription.next_billing_date ? new Date(subscription.next_billing_date) : new Date(Date.now() + 30 * 86400000);
+    return calculateProration({
+      currentPaidValue: Number(subscription.original_price || 0),
+      currentPeriod: (subscription.billing_period as BillingPeriod) || "monthly",
+      cycleStart,
+      cycleEnd,
+      newValue,
+      newPeriod: billingPeriod as BillingPeriod,
+      availableCredits,
+      now: new Date(),
+    });
+  })();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -249,7 +294,52 @@ export function EditCompanyDialog({ company, open, onOpenChange, onSuccess }: Ed
             
           if (subError) throw subError;
         }
+
+        // Aplicar proporção: gerar crédito (downgrade) ou consumir crédito (upgrade)
+        if (proration) {
+          const expiresAt = new Date();
+          expiresAt.setMonth(expiresAt.getMonth() + 12);
+
+          if (proration.creditGenerated > 0) {
+            await supabase.from("company_credits").insert([{
+              company_id: company.id,
+              amount: proration.creditGenerated,
+              original_amount: proration.creditGenerated,
+              reason: `Crédito proporcional gerado em mudança de plano via painel super admin (${proration.details.daysRemaining} dias restantes)`,
+              source: "admin_change",
+              status: "active",
+              source_subscription_id: subscription?.id ?? null,
+              expires_at: expiresAt.toISOString(),
+            }]);
+          }
+
+          if (proration.creditsConsumed > 0) {
+            const { data: activeCredits } = await supabase
+              .from("company_credits")
+              .select("*")
+              .eq("company_id", company.id)
+              .eq("status", "active")
+              .order("expires_at", { ascending: true });
+            let remaining = proration.creditsConsumed;
+            for (const c of (activeCredits as any[]) || []) {
+              if (remaining <= 0) break;
+              const used = Math.min(Number(c.amount), remaining);
+              const newAmount = Number(c.amount) - used;
+              await supabase
+                .from("company_credits")
+                .update({
+                  amount: newAmount,
+                  status: newAmount <= 0.01 ? "used" : "active",
+                  used_at: newAmount <= 0.01 ? new Date().toISOString() : null,
+                })
+                .eq("id", c.id);
+              remaining -= used;
+            }
+          }
+          setCreditsRefreshKey((k) => k + 1);
+        }
       }
+
 
       toast({
         title: "Empresa atualizada",
@@ -402,6 +492,44 @@ export function EditCompanyDialog({ company, open, onOpenChange, onSuccess }: Ed
               Valor base ({getPeriodLabel(billingPeriod)}): {formatPrice(getCurrentPlanPrice())}. Alterações aplicam-se imediatamente.
             </p>
           )}
+
+          {/* Preview de proporção */}
+          {proration && (
+            <Card className={proration.action === "upgrade" ? "border-blue-500/40 bg-blue-500/5" : "border-emerald-500/40 bg-emerald-500/5"}>
+              <CardContent className="pt-4 space-y-2 text-sm">
+                <div className="flex items-center gap-2 font-semibold">
+                  {proration.action === "upgrade" ? (
+                    <><ArrowUpCircle className="w-4 h-4 text-blue-500" /> Upgrade detectado</>
+                  ) : (
+                    <><ArrowDownCircle className="w-4 h-4 text-emerald-500" /> Downgrade detectado</>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {proration.details.daysRemaining} dias restantes do ciclo atual ({proration.details.cycleDays}d).
+                  Crédito não usado do plano anterior: {formatBRL(proration.details.unusedCredit)}.
+                  Custo proporcional do novo plano para o período restante: {formatBRL(proration.details.newCostForRemainingDays)}.
+                </p>
+                {proration.action === "upgrade" && (
+                  <div className="space-y-1">
+                    {proration.creditsConsumed > 0 && (
+                      <p className="text-xs">Créditos disponíveis serão abatidos: <span className="font-semibold">{formatBRL(proration.creditsConsumed)}</span></p>
+                    )}
+                    <p className="font-semibold">A cobrar agora: {formatBRL(proration.chargeNow)}</p>
+                    <p className="text-xs text-muted-foreground">Próxima cobrança: {proration.nextBillingDate.toLocaleDateString("pt-BR")}</p>
+                  </div>
+                )}
+                {proration.action === "downgrade" && (
+                  <div className="space-y-1">
+                    <p className="font-semibold text-emerald-600">Crédito gerado: {formatBRL(proration.creditGenerated)}</p>
+                    <p className="text-xs text-muted-foreground">Validade: 12 meses. Será abatido automaticamente em mudanças/futuras faturas.</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Painel de créditos da empresa */}
+          {company && <CompanyCreditsPanel companyId={company.id} refreshKey={creditsRefreshKey} />}
 
           {/* Pending Plan Change (downgrade/upgrade scheduled) */}
           {subscription?.pending_plan_change && (

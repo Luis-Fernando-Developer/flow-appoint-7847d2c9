@@ -10,6 +10,7 @@ import AdminLogin from "./pages/admin/Login";
 import SuperAdminDashboard from "./pages/admin/SuperAdminDashboard";
 import CreateCompany from "./pages/admin/CreateCompany";
 import SignUp from "./pages/SignUp";
+import SignupPending from "./pages/SignupPending";
 import BusinessLogin from "./pages/business/Login";
 import CompanyLandingPage from "./pages/company/[slug]";
 import BusinessDashboard from "./pages/business/Dashboard";
@@ -44,6 +45,7 @@ const App = () => (
             <Route path="/" element={<LandingPage />} />
             {/* rota cadastro para empresarios via landipage */}
             <Route path="/signup" element={<SignUp />} />
+            <Route path="/signup/aguardando/:companyId" element={<SignupPending />} />
 
             {/* rotas login para empresarios via landingpage ou diretamente via slog */}
             <Route path="/login" element={<BusinessLogin />} />

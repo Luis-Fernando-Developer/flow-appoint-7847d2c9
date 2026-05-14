@@ -107,6 +107,63 @@ export type Database = {
           },
         ]
       }
+      booking_payments: {
+        Row: {
+          amount: number
+          asaas_charge_id: string | null
+          bank_slip_url: string | null
+          booking_id: string
+          company_id: string
+          created_at: string
+          id: string
+          invoice_url: string | null
+          metadata: Json | null
+          method: string | null
+          paid_at: string | null
+          pix_payload: string | null
+          pix_qr_code: string | null
+          platform_fee_amount: number | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          asaas_charge_id?: string | null
+          bank_slip_url?: string | null
+          booking_id: string
+          company_id: string
+          created_at?: string
+          id?: string
+          invoice_url?: string | null
+          metadata?: Json | null
+          method?: string | null
+          paid_at?: string | null
+          pix_payload?: string | null
+          pix_qr_code?: string | null
+          platform_fee_amount?: number | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          asaas_charge_id?: string | null
+          bank_slip_url?: string | null
+          booking_id?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          invoice_url?: string | null
+          metadata?: Json | null
+          method?: string | null
+          paid_at?: string | null
+          pix_payload?: string | null
+          pix_qr_code?: string | null
+          platform_fee_amount?: number | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       bookings: {
         Row: {
           booking_date: string
@@ -117,6 +174,7 @@ export type Database = {
           end_time: string
           id: string
           notes: string | null
+          payment_status: string
           service_id: string | null
           start_time: string
           status: string | null
@@ -131,6 +189,7 @@ export type Database = {
           end_time: string
           id?: string
           notes?: string | null
+          payment_status?: string
           service_id?: string | null
           start_time: string
           status?: string | null
@@ -145,6 +204,7 @@ export type Database = {
           end_time?: string
           id?: string
           notes?: string | null
+          payment_status?: string
           service_id?: string | null
           start_time?: string
           status?: string | null
@@ -754,6 +814,48 @@ export type Database = {
         }
         Relationships: []
       }
+      company_payment_accounts: {
+        Row: {
+          asaas_api_key_encrypted: string | null
+          asaas_subaccount_id: string | null
+          asaas_wallet_id: string | null
+          bank_data: Json | null
+          company_id: string
+          cpf_cnpj: string | null
+          created_at: string
+          id: string
+          onboarding_data: Json | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          asaas_api_key_encrypted?: string | null
+          asaas_subaccount_id?: string | null
+          asaas_wallet_id?: string | null
+          bank_data?: Json | null
+          company_id: string
+          cpf_cnpj?: string | null
+          created_at?: string
+          id?: string
+          onboarding_data?: Json | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          asaas_api_key_encrypted?: string | null
+          asaas_subaccount_id?: string | null
+          asaas_wallet_id?: string | null
+          bank_data?: Json | null
+          company_id?: string
+          cpf_cnpj?: string | null
+          created_at?: string
+          id?: string
+          onboarding_data?: Json | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       company_payment_methods: {
         Row: {
           asaas_customer_id: string | null
@@ -798,6 +900,39 @@ export type Database = {
           is_default?: boolean
           last_digits?: string | null
           type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      company_payment_settings: {
+        Row: {
+          accepted_methods: Json
+          company_id: string
+          created_at: string
+          own_gateway_api_key_encrypted: string | null
+          own_gateway_provider: string | null
+          payment_mode: string
+          platform_fee_percentage: number
+          updated_at: string
+        }
+        Insert: {
+          accepted_methods?: Json
+          company_id: string
+          created_at?: string
+          own_gateway_api_key_encrypted?: string | null
+          own_gateway_provider?: string | null
+          payment_mode?: string
+          platform_fee_percentage?: number
+          updated_at?: string
+        }
+        Update: {
+          accepted_methods?: Json
+          company_id?: string
+          created_at?: string
+          own_gateway_api_key_encrypted?: string | null
+          own_gateway_provider?: string | null
+          payment_mode?: string
+          platform_fee_percentage?: number
           updated_at?: string
         }
         Relationships: []
@@ -1327,6 +1462,7 @@ export type Database = {
           id: string
           is_active: boolean | null
           name: string
+          payment_required: string
           price: number
           updated_at: string
         }
@@ -1339,6 +1475,7 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           name: string
+          payment_required?: string
           price?: number
           updated_at?: string
         }
@@ -1351,6 +1488,7 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           name?: string
+          payment_required?: string
           price?: number
           updated_at?: string
         }

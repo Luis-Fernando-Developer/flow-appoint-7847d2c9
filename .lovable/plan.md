@@ -1,154 +1,152 @@
 ## Objetivo
 
-Tornar o botão "Gerenciar Plano" funcional na aba de Configurações da empresa, integrando ao Asaas como gateway. Cobrir: cobrança recorrente (cartão, débito automático, PIX), antecipação de fatura D-3, upgrade/downgrade com proration, troca de método de pagamento (último usado vira padrão), histórico/lista de faturas com download de PDF, e exibição de plano atual + limites.
+Permitir que clientes finais paguem agendamentos online. Cada estabelecimento decide como receber, quais métodos aceitar e em quais serviços o pagamento é exigido.
 
 ---
 
-## Modelo de cobrança (decisões)
+## Modelos de recebimento (escolha por empresa)
 
-**Antecipação D-3:** cron diário consulta assinaturas cuja `next_billing_date` está em D+3 e cria a próxima cobrança no Asaas com `dueDate` igual ao dia da renovação. Cliente recebe PIX/boleto/cartão com 3 dias de antecedência. Cartão e débito automático são cobrados pelo Asaas no vencimento (sem ação manual). PIX exige ação do cliente — enviamos link/QR por e-mail.
+**Modo 1 — Asaas Gerenciado (split com taxa da plataforma):**
+- Empresa faz onboarding (CNPJ/CPF + dados bancários) que cria uma subconta Asaas
+- Cobranças geradas via API Asaas com `split` automático para a subconta
+- Taxa da plataforma fica configurável (zero por padrão até você definir)
+- Ideal pra estabelecimento que não tem gateway próprio
 
-**Upgrade (proration imediata):**
-- Calcula `valor_diferenca = (preço_novo − preço_atual) × dias_restantes ÷ dias_ciclo`
-- Cria cobrança avulsa no Asaas pelo valor proporcional, vencimento em 1 dia
-- Quando paga (ou se for cartão recorrente, cobrada na hora), troca o plano e mantém a `next_billing_date` original
-- Bloqueio: não permite upgrade se houver fatura vencida em aberto
+**Modo 2 — Gateway Próprio:**
+- Empresa cola a própria API key do Asaas/Mercado Pago/Stripe nas configurações
+- Edge function usa a key dela diretamente; pagamento cai 100% na conta dela
+- Sem split, sem taxa da plataforma
+- MVP: começamos só com Asaas próprio (Mercado Pago/Stripe ficam para fase 2 — mesma estrutura)
 
-**Downgrade (agendado):**
-- Marca `pending_plan_change = { plan_id, effective_at: next_billing_date }` na `company_subscriptions`
-- Plano atual permanece até o fim do ciclo
-- No D-3, cron gera a próxima fatura já com o novo plano e zera o `pending_plan_change`
-- Permite cancelar o downgrade antes do efetivo
-
-**Por quê assim:** evita reembolso (downgrade) e maximiza receita justa (upgrade). Padrão Stripe/Chargebee.
-
----
-
-## Métodos de pagamento
-
-Tabela `company_payment_methods`:
-- `type`: `credit_card` | `pix` | `bank_debit`
-- `asaas_token` (cartão tokenizado / mandato débito)
-- `last_digits`, `brand`, `bank_name` (display)
-- `is_default` (último usado = default automático)
-- Apenas 1 default por empresa (trigger)
-
-Fluxo:
-- **Cartão**: tokenização via Asaas Checkout (não armazenamos PAN). Renovação automática.
-- **Débito automático**: aceite + dados bancários via Asaas (mandato). Renovação automática.
-- **PIX**: não armazena nada; cada fatura gera novo QR. Default = "última usada", mas exige ação manual no vencimento.
-
-Após pagamento bem-sucedido, webhook do Asaas atualiza `is_default` para o método usado.
+**Modo 3 — Sem pagamento online:**
+- Cliente só agenda; pagamento é presencial
+- Dono pode marcar booking como pago manualmente
 
 ---
 
-## Banco de dados (migrations)
+## Regras de pagamento
+
+**Por empresa (settings):**
+- `payment_mode`: `asaas_managed` | `own_gateway` | `none`
+- `accepted_methods`: `{pix, credit_card, debit_card, boleto}` com toggle individual (boleto OFF por padrão)
+- `own_gateway_provider` + `own_gateway_api_key` (criptografada) quando modo 2
+
+**Por serviço:**
+- `payment_required`: `always` | `optional` | `never` (default `optional`)
+
+**Ao agendar:**
+- Se `never` ou modo `none` → fluxo atual (sem pagamento)
+- Se `optional` → cliente vê "Pagar agora" ou "Pagar no local"
+- Se `always` → checkout obrigatório antes de confirmar booking
+
+---
+
+## Banco de dados (migration)
 
 ```sql
--- assinatura: rastreio de ciclo e mudanças pendentes
-ALTER TABLE company_subscriptions ADD COLUMN
-  asaas_subscription_id text,
-  next_billing_date date,
-  pending_plan_change jsonb,
-  current_payment_method_id uuid;
-
--- métodos de pagamento
-CREATE TABLE company_payment_methods (
-  id uuid PRIMARY KEY,
-  company_id uuid NOT NULL,
-  type text NOT NULL,           -- credit_card | pix | bank_debit
-  asaas_token text,
-  display_label text,           -- "Visa •••• 1234"
-  brand text, last_digits text, bank_name text,
-  is_default boolean DEFAULT false,
-  is_active boolean DEFAULT true,
-  created_at timestamptz DEFAULT now()
+-- nova tabela: subconta Asaas por empresa (modo 1)
+CREATE TABLE company_payment_accounts (
+  id uuid PK,
+  company_id uuid UNIQUE,
+  asaas_subaccount_id text,
+  asaas_api_key_encrypted text,   -- key da subconta retornada no onboarding
+  status text,                     -- pending | active | rejected
+  cpf_cnpj text,
+  bank_data jsonb,
+  created_at timestamptz
 );
 
--- faturas (espelho das cobranças do Asaas, p/ relatório e PDF)
-CREATE TABLE company_invoices (
-  id uuid PRIMARY KEY,
-  company_id uuid NOT NULL,
-  subscription_id uuid,
-  asaas_charge_id text UNIQUE,
-  amount numeric NOT NULL,
-  status text NOT NULL,         -- pending | paid | overdue | refunded | cancelled
-  billing_type text,            -- CREDIT_CARD | PIX | DEBIT
-  due_date date NOT NULL,
-  paid_at timestamptz,
-  invoice_url text,             -- PDF do Asaas
+-- configurações de pagamento da empresa
+CREATE TABLE company_payment_settings (
+  company_id uuid PK,
+  payment_mode text DEFAULT 'none',
+  accepted_methods jsonb DEFAULT '{"pix":true,"credit_card":true,"debit_card":true,"boleto":false}',
+  platform_fee_percentage numeric DEFAULT 0,
+  own_gateway_provider text,            -- asaas | mercadopago | stripe
+  own_gateway_api_key_encrypted text,
+  updated_at timestamptz
+);
+
+-- regra por serviço
+ALTER TABLE services ADD COLUMN payment_required text DEFAULT 'optional';
+
+-- pagamentos de bookings (espelho)
+CREATE TABLE booking_payments (
+  id uuid PK,
+  booking_id uuid UNIQUE,
+  company_id uuid,
+  amount numeric,
+  status text,                    -- pending | paid | failed | refunded
+  method text,                    -- pix | credit_card | debit_card | boleto
+  asaas_charge_id text,
+  invoice_url text,
   pix_qr_code text,
-  description text,
-  created_at timestamptz DEFAULT now()
+  pix_payload text,
+  paid_at timestamptz,
+  created_at timestamptz
 );
 
--- limites por tier (espelha o builder, mas centralizado aqui)
-CREATE TABLE plan_limits (
-  plan_id uuid PRIMARY KEY,
-  max_employees int, max_services int, max_bookings_month int,
-  max_chatbots int, max_chatbot_messages int, max_integrations int,
-  features jsonb
-);
+ALTER TABLE bookings ADD COLUMN payment_status text DEFAULT 'not_required';
 ```
 
-Todas com RLS: SELECT público controlado por company, ALL apenas service_role (webhook + admin).
+Tudo com RLS (SELECT público controlado, INSERT/UPDATE só authenticated; webhook usa service role).
 
 ---
 
-## Edge functions (Asaas)
+## Edge functions
 
-1. **`asaas-create-customer`** — cria/atualiza cliente Asaas a partir da company.
-2. **`asaas-create-subscription`** — cria assinatura recorrente quando empresa adere a um plano pago.
-3. **`asaas-change-plan`** — recebe `{ company_id, new_plan_id, action: 'upgrade'|'downgrade' }`, calcula proration e age de acordo.
-4. **`asaas-tokenize-card`** — proxy para Asaas Checkout / tokenização (retorna URL hospedada do Asaas).
-5. **`asaas-set-payment-method`** — define método ativo da próxima cobrança e marca como default.
-6. **`asaas-webhook`** (verify_jwt=false, valida `asaas-access-token` no header) — recebe eventos `PAYMENT_CONFIRMED`, `PAYMENT_RECEIVED`, `PAYMENT_OVERDUE`, `PAYMENT_REFUNDED`, atualiza `company_invoices`, marca método como default, sincroniza `next_billing_date`, e em caso de overdue dispara downgrade automático para `suspended` (que sincroniza com builder).
-7. **`asaas-billing-cron`** (cron diário 03:00) — varre subscriptions com `next_billing_date = hoje + 3 dias`, aplica `pending_plan_change` se houver, cria a próxima cobrança no Asaas.
-8. **`asaas-list-invoices`** — proxy autenticado que lista faturas da empresa com URL do PDF.
-
-Secret necessário: `ASAAS_API_KEY` + `ASAAS_WEBHOOK_TOKEN` + `ASAAS_ENV` (sandbox/prod).
+1. **`asaas-onboard-subaccount`** — cria subconta Asaas para empresa (modo 1), salva `asaas_subaccount_id` + key
+2. **`booking-create-payment`** — recebe `booking_id`, lê `payment_mode` da empresa, gera cobrança no Asaas correto (subconta com split, ou key própria) e devolve QR PIX / link cartão / boleto
+3. **`asaas-payment-webhook`** — recebe `PAYMENT_CONFIRMED/RECEIVED/REFUNDED`, atualiza `booking_payments` + `bookings.payment_status` + dispara confirmação automática do agendamento
+4. Reutiliza `_shared/asaas.ts` com helper que aceita key dinâmica (subconta ou própria)
 
 ---
 
-## Frontend — Página `Gerenciar Plano`
+## Frontend
 
-Rota: `/business/:slug/billing` (botão "Gerenciar Plano" em Settings.tsx aponta pra cá).
+**Settings (empresa):**
+- Nova aba "Pagamentos" com seleção de modo, onboarding subconta, toggles de métodos, taxa da plataforma (somente leitura para dono)
 
-Layout em abas:
-- **Plano Atual**: nome, preço, ciclo, próxima cobrança, limites (uso × máximo via `plan_limits`), badge se houver `pending_plan_change`. Botões "Mudar de plano" e "Cancelar assinatura".
-- **Mudar de plano**: lista todos os planos. Mostra preview de proration (upgrade) ou data efetiva (downgrade) antes de confirmar.
-- **Métodos de pagamento**: lista de cartões/débitos salvos + opção PIX. Botão "Adicionar cartão" abre Asaas Checkout em iframe/redirect. "Definir como padrão" e "Remover".
-- **Histórico de faturas**: tabela com data, valor, status (badge), método, ação "Baixar PDF" (abre `invoice_url` do Asaas) + "Pagar agora" se pendente (abre QR PIX ou cartão).
+**Cadastro/edição de serviço:**
+- Campo `payment_required` (radio: Sempre / Opcional / Nunca)
+
+**Booking público (cliente final):**
+- Step novo após escolher horário: "Como você quer pagar?"
+- Renderiza QR PIX / form cartão tokenizado / link boleto conforme método escolhido
+- Polling até confirmação OU exibe "aguardando pagamento" e libera quando webhook chegar
+- Se `optional`, botão "Pagar no local" pula o checkout
+
+**Painel de bookings (dono):**
+- Badge de status de pagamento por agendamento
+- Botão "Marcar como pago" para presencial
+- Link para fatura/comprovante
 
 ---
 
-## Sincronia com builder-flow-api
+## Detalhes técnicos
 
-Já existe `syncBuilderPlan`. Adicionar gatilhos em:
-- Webhook do Asaas após `PAYMENT_CONFIRMED` de upgrade efetivado → sync (novo tier).
-- Webhook após `PAYMENT_OVERDUE` (3+ dias) → sync com `suspended`.
-- Cron de billing após aplicar `pending_plan_change` → sync (downgrade efetivado).
+- Helper `asaas()` aceita parâmetro opcional `apiKey` para usar key da subconta ou key própria da empresa
+- Split via `split: [{walletId, percentualValue}]` do Asaas no modo 1
+- Criptografia de keys próprias usa o mesmo `CHATBOT_KEY_ENCRYPTION_SECRET` já configurado
+- Webhook único `asaas-payment-webhook` com `verify_jwt=false`, valida `ASAAS_WEBHOOK_TOKEN`
+- Booking só vira `confirmed` automaticamente após `paid` quando `payment_required=always`
 
 ---
 
 ## Ordem de execução
 
-1. Migration (tabelas + colunas + RLS + plan_limits seed).
-2. Pedir secret `ASAAS_API_KEY` + `ASAAS_WEBHOOK_TOKEN`.
-3. Edge functions Asaas (create-customer, create-subscription, webhook, list-invoices).
-4. Página `BillingManagement.tsx` com aba Plano Atual + Faturas (somente leitura primeiro).
-5. Tokenização de cartão + métodos de pagamento.
-6. Mudança de plano com proration (upgrade/downgrade).
-7. Cron de antecipação D-3.
-8. Wire-up botão "Gerenciar Plano" em Settings.tsx + rota.
+1. Migration (tabelas + colunas + RLS)
+2. Edge functions (onboard, create-payment, webhook)
+3. Aba "Pagamentos" em Settings + onboarding modo 1
+4. Campo `payment_required` em serviços
+5. Step de pagamento no booking público
+6. Status de pagamento no painel de bookings
 
 ---
 
 ## Fora de escopo desta entrega
 
-- Emissão de NFS-e (fica para fase 2).
-- PDF customizado (usamos o do Asaas).
-- Pagamento de fatura avulsa fora do ciclo (não-renovação).
-- Multi-moeda.
-
-Se aprovar, começo pela migration + pedido do `ASAAS_API_KEY`.
+- Mercado Pago e Stripe como gateway próprio (estrutura fica pronta, conector real fica fase 2)
+- Reembolso automatizado pelo painel (manual via Asaas por enquanto)
+- Parcelamento no cartão (1x apenas no MVP)
+- Notificações por email/WhatsApp ao pagar

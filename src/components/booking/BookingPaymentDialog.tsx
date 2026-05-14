@@ -127,6 +127,17 @@ export function BookingPaymentDialog({ open, onClose, bookingId, companyId, amou
           </div>
         )}
 
+        {payment && payment.method === "PIX" && !payment.pix_qr_code && payment.invoice_url && (
+          <div className="space-y-3 text-center">
+            <QrCode className="w-12 h-12 mx-auto text-primary" />
+            <p className="text-sm">Você será redirecionado para gerar o QR PIX no checkout do gateway.</p>
+            <Button asChild><a href={payment.invoice_url} target="_blank" rel="noreferrer">Abrir pagamento PIX</a></Button>
+            <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
+              <Loader2 className="w-3 h-3 animate-spin" /> Aguardando confirmação...
+            </p>
+          </div>
+        )}
+
         {payment && payment.method === "BOLETO" && (
           <div className="space-y-3 text-center">
             <Receipt className="w-12 h-12 mx-auto text-primary" />

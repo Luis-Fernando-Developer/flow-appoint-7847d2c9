@@ -26,14 +26,63 @@ interface Props {
   ownerPhone?: string | null;
 }
 
+type Provider = "asaas" | "mercadopago" | "stripe" | "pagarme";
+
 const METHOD_META: Record<string, { label: string; icon: any; help?: string }> = {
   pix: { label: "PIX", icon: QrCode, help: "Confirmação instantânea, taxa baixa." },
   credit_card: { label: "Cartão de Crédito", icon: CreditCard, help: "Permite parcelamento (1x no MVP)." },
   debit_card: { label: "Cartão de Débito", icon: CreditCard },
-  boleto: { label: "Boleto bancário", icon: Receipt, help: "Confirmação em 1-3 dias úteis. Desligado por padrão." },
+  boleto: { label: "Boleto bancário", icon: Receipt, help: "Confirmação em 1-3 dias úteis." },
 };
 
-const WEBHOOK_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/asaas-webhook`;
+const PROVIDER_INFO: Record<Provider, {
+  label: string;
+  methods: string[];
+  keyPlaceholder: string;
+  keyHelp: string;
+  webhookSlug: string;
+  panelUrl: string;
+  webhookHelp: string;
+}> = {
+  asaas: {
+    label: "Asaas",
+    methods: ["pix", "credit_card", "debit_card", "boleto"],
+    keyPlaceholder: "$aact_...",
+    keyHelp: "Painel Asaas → Integrações → Chave de API.",
+    webhookSlug: "asaas-webhook",
+    panelUrl: "https://www.asaas.com/customerWebhook/list",
+    webhookHelp: "Cadastre como Webhook genérico, evento 'PAYMENT_RECEIVED'.",
+  },
+  mercadopago: {
+    label: "Mercado Pago",
+    methods: ["pix", "credit_card", "debit_card", "boleto"],
+    keyPlaceholder: "APP_USR-...",
+    keyHelp: "Painel MP → Suas integrações → Credenciais → Access Token de produção.",
+    webhookSlug: "mercadopago-webhook",
+    panelUrl: "https://www.mercadopago.com.br/developers/panel/app",
+    webhookHelp: "Cadastre como Notificação Webhooks, eventos 'payment'.",
+  },
+  stripe: {
+    label: "Stripe",
+    methods: ["credit_card", "boleto"],
+    keyPlaceholder: "sk_live_... ou sk_test_...",
+    keyHelp: "Stripe Dashboard → Developers → API keys → Secret key.",
+    webhookSlug: "stripe-webhook",
+    panelUrl: "https://dashboard.stripe.com/webhooks",
+    webhookHelp: "Eventos: checkout.session.completed, checkout.session.async_payment_succeeded.",
+  },
+  pagarme: {
+    label: "Pagar.me",
+    methods: ["pix", "credit_card", "debit_card", "boleto"],
+    keyPlaceholder: "sk_...",
+    keyHelp: "Painel Pagar.me → Configurações → Chaves de API → Secret Key.",
+    webhookSlug: "pagarme-webhook",
+    panelUrl: "https://dash.pagar.me/",
+    webhookHelp: "Eventos: order.paid, charge.paid.",
+  },
+};
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
 export function PaymentSettings({ companyId }: Props) {
   const { toast } = useToast();
@@ -46,7 +95,7 @@ export function PaymentSettings({ companyId }: Props) {
   const [settings, setSettings] = useState<any>({
     payment_mode: "none",
     accepted_methods: { pix: true, credit_card: true, debit_card: true, boleto: false },
-    own_gateway_provider: "asaas",
+    own_gateway_provider: "asaas" as Provider,
   });
 
   useEffect(() => { load(); }, [companyId]);
@@ -62,7 +111,7 @@ export function PaymentSettings({ companyId }: Props) {
       setSettings({
         payment_mode: s.payment_mode || "none",
         accepted_methods: s.accepted_methods || { pix: true, credit_card: true, debit_card: true, boleto: false },
-        own_gateway_provider: s.own_gateway_provider || "asaas",
+        own_gateway_provider: (s.own_gateway_provider as Provider) || "asaas",
       });
       setHasStoredKey(!!s.own_gateway_api_key_encrypted);
     }
@@ -79,7 +128,6 @@ export function PaymentSettings({ companyId }: Props) {
         own_gateway_provider: settings.own_gateway_provider,
       };
 
-      // Se uma nova key foi digitada, criptografa via RPC
       if (apiKeyInput.trim()) {
         const { data: enc, error: encErr } = await (supabase as any).rpc("encrypt_chatbot_key", {
           p_plain: apiKeyInput.trim(),
@@ -125,6 +173,16 @@ export function PaymentSettings({ companyId }: Props) {
     }
   }
 
+  function changeProvider(p: Provider) {
+    const supported = PROVIDER_INFO[p].methods;
+    const newMethods: any = {};
+    Object.keys(METHOD_META).forEach((k) => {
+      newMethods[k] = supported.includes(k) ? !!settings.accepted_methods?.[k] : false;
+    });
+    setSettings({ ...settings, own_gateway_provider: p, accepted_methods: newMethods });
+    setValidatedAccount(null);
+  }
+
   function toggleMethod(key: string, value: boolean) {
     setSettings({ ...settings, accepted_methods: { ...settings.accepted_methods, [key]: value } });
   }
@@ -139,6 +197,9 @@ export function PaymentSettings({ companyId }: Props) {
   }
 
   const enabled = settings.payment_mode === "own_gateway";
+  const provider = settings.own_gateway_provider as Provider;
+  const info = PROVIDER_INFO[provider];
+  const webhookUrl = `${SUPABASE_URL}/functions/v1/${info.webhookSlug}`;
 
   return (
     <div className="space-y-6">
@@ -178,24 +239,25 @@ export function PaymentSettings({ companyId }: Props) {
         <Card>
           <CardHeader>
             <CardTitle>Gateway de pagamento</CardTitle>
-            <CardDescription>Conecte sua conta para gerar cobranças.</CardDescription>
+            <CardDescription>Escolha o provedor e conecte sua conta.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
               <Label>Provedor</Label>
-              <select
-                className="w-full h-10 px-3 border rounded-md bg-background"
-                value={settings.own_gateway_provider}
-                onChange={(e) => setSettings({ ...settings, own_gateway_provider: e.target.value })}
-              >
-                <option value="asaas">Asaas</option>
-                <option value="mercadopago" disabled>Mercado Pago (em breve)</option>
-                <option value="stripe" disabled>Stripe (em breve)</option>
-                <option value="pagarme" disabled>Pagar.me (em breve)</option>
-              </select>
-              <p className="text-xs text-muted-foreground mt-1">
-                No momento, apenas Asaas está disponível. Mais provedores chegando em breve.
-              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
+                {(Object.keys(PROVIDER_INFO) as Provider[]).map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => changeProvider(p)}
+                    className={`p-3 border rounded-lg text-sm font-medium transition-colors text-left ${
+                      provider === p ? "border-primary bg-primary/5 text-primary" : "hover:bg-muted/50"
+                    }`}
+                  >
+                    {PROVIDER_INFO[p].label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div>
@@ -211,11 +273,9 @@ export function PaymentSettings({ companyId }: Props) {
                 type="password"
                 value={apiKeyInput}
                 onChange={(e) => { setApiKeyInput(e.target.value); setValidatedAccount(null); }}
-                placeholder={hasStoredKey ? "•••••••••• (cole uma nova chave para substituir)" : "$aact_..."}
+                placeholder={hasStoredKey ? "•••••••••• (cole uma nova chave para substituir)" : info.keyPlaceholder}
               />
-              <p className="text-xs text-muted-foreground mt-1">
-                Crie uma chave no painel Asaas em <strong>Integrações → Chave de API</strong>.
-              </p>
+              <p className="text-xs text-muted-foreground mt-1">{info.keyHelp}</p>
               <Button
                 type="button"
                 variant="outline"
@@ -230,24 +290,24 @@ export function PaymentSettings({ companyId }: Props) {
             </div>
 
             <div className="rounded-lg border bg-muted/40 p-4 space-y-2">
-              <div className="font-medium text-sm">Webhook (opcional, mas recomendado)</div>
+              <div className="font-medium text-sm">Webhook (recomendado)</div>
               <p className="text-xs text-muted-foreground">
-                Cadastre esta URL no painel Asaas em <strong>Integrações → Webhooks</strong> para que confirmações
-                de pagamento atualizem o status do agendamento automaticamente.
+                Cadastre esta URL no painel do {info.label} para que confirmações de pagamento atualizem o status do
+                agendamento automaticamente. {info.webhookHelp}
               </p>
               <div className="flex items-center gap-2">
-                <Input readOnly value={WEBHOOK_URL} className="font-mono text-xs" />
-                <Button type="button" variant="outline" size="icon" onClick={() => copy(WEBHOOK_URL)}>
+                <Input readOnly value={webhookUrl} className="font-mono text-xs" />
+                <Button type="button" variant="outline" size="icon" onClick={() => copy(webhookUrl)}>
                   <Copy className="w-4 h-4" />
                 </Button>
               </div>
               <a
-                href="https://www.asaas.com/customerWebhook/list"
+                href={info.panelUrl}
                 target="_blank"
                 rel="noreferrer"
                 className="text-xs text-primary inline-flex items-center gap-1 hover:underline"
               >
-                Abrir painel Asaas <ExternalLink className="w-3 h-3" />
+                Abrir painel {info.label} <ExternalLink className="w-3 h-3" />
               </a>
             </div>
           </CardContent>
@@ -258,23 +318,32 @@ export function PaymentSettings({ companyId }: Props) {
         <Card>
           <CardHeader>
             <CardTitle>Métodos aceitos</CardTitle>
-            <CardDescription>Habilite as formas de pagamento que seus clientes podem usar.</CardDescription>
+            <CardDescription>
+              Habilite as formas de pagamento. Métodos não suportados pelo {info.label} ficam desabilitados.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {Object.entries(METHOD_META).map(([key, meta]) => {
               const Icon = meta.icon;
+              const supported = info.methods.includes(key);
               return (
-                <div key={key} className="flex items-center justify-between p-3 border rounded-lg">
+                <div
+                  key={key}
+                  className={`flex items-center justify-between p-3 border rounded-lg ${!supported ? "opacity-50" : ""}`}
+                >
                   <div className="flex items-center gap-3">
                     <Icon className="w-5 h-5 text-muted-foreground" />
                     <div>
                       <div className="font-medium">{meta.label}</div>
-                      {meta.help && <p className="text-xs text-muted-foreground">{meta.help}</p>}
+                      <p className="text-xs text-muted-foreground">
+                        {supported ? meta.help : `Não disponível em ${info.label}`}
+                      </p>
                     </div>
                   </div>
                   <Switch
                     checked={!!settings.accepted_methods?.[key]}
                     onCheckedChange={(v) => toggleMethod(key, v)}
+                    disabled={!supported}
                   />
                 </div>
               );

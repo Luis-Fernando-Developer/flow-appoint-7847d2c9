@@ -1001,6 +1001,7 @@ export type Database = {
           id: string
           next_billing_date: string | null
           original_price: number
+          overage_grace_until: string | null
           pending_plan_change: Json | null
           plan_id: string
           starts_at: string | null
@@ -1020,6 +1021,7 @@ export type Database = {
           id?: string
           next_billing_date?: string | null
           original_price?: number
+          overage_grace_until?: string | null
           pending_plan_change?: Json | null
           plan_id: string
           starts_at?: string | null
@@ -1039,6 +1041,7 @@ export type Database = {
           id?: string
           next_billing_date?: string | null
           original_price?: number
+          overage_grace_until?: string | null
           pending_plan_change?: Json | null
           plan_id?: string
           starts_at?: string | null
@@ -1570,6 +1573,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_plan_limit: {
+        Args: { _company_id: string; _resource: string }
+        Returns: Json
+      }
+      count_company_resource: {
+        Args: { _company_id: string; _resource: string }
+        Returns: number
+      }
       decrypt_chatbot_key: {
         Args: { p_cipher: string; p_secret: string }
         Returns: string

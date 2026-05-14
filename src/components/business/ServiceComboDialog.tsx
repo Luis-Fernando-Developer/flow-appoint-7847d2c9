@@ -16,6 +16,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent } from "@/components/ui/card";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
+import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { Package, Plus, Clock, DollarSign } from "lucide-react";
 
 interface Service {
@@ -32,6 +33,7 @@ interface ServiceComboDialogProps {
 
 export function ServiceComboDialog({ companyId, onComboAdded }: ServiceComboDialogProps) {
   const { toast } = useToast();
+  const { guard } = usePlanLimits(companyId);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [services, setServices] = useState<Service[]>([]);
@@ -171,6 +173,8 @@ export function ServiceComboDialog({ companyId, onComboAdded }: ServiceComboDial
       });
       return;
     }
+
+    if (!(await guard("combos"))) return;
 
     setLoading(true);
 

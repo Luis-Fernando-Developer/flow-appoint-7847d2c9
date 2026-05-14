@@ -24,3 +24,9 @@ verify_jwt = false
 [functions.signup-with-payment]
 verify_jwt = false
 
+[functions.booking-create-payment]
+verify_jwt = false
+
+[functions.asaas-onboard-subaccount]
+verify_jwt = false
+

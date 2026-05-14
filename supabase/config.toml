@@ -21,3 +21,9 @@ verify_jwt = false
 [functions.asaas-billing-cron]
 verify_jwt = false
 
+[functions.signup-with-payment]
+verify_jwt = false
+
+[functions.signup-status]
+verify_jwt = false
+

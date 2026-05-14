@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Plus } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
+import { usePlanLimits } from "@/hooks/usePlanLimits";
 
 interface AddServiceDialogProps {
   companyId: string;
@@ -18,6 +19,7 @@ export function AddServiceDialog({ companyId, onServiceAdded }: AddServiceDialog
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const { guard } = usePlanLimits(companyId);
   
   const [formData, setFormData] = useState({
     name: "",
@@ -30,6 +32,7 @@ export function AddServiceDialog({ companyId, onServiceAdded }: AddServiceDialog
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (formData.is_active && !(await guard("services"))) return;
     setLoading(true);
 
     try {

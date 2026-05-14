@@ -46,6 +46,7 @@ interface Subscription {
   original_price: number;
   discount_percentage: number;
   discount_cycles_remaining: number;
+  pending_plan_change: any;
 }
 
 interface EditCompanyDialogProps {

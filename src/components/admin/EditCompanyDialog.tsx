@@ -493,6 +493,44 @@ export function EditCompanyDialog({ company, open, onOpenChange, onSuccess }: Ed
             </p>
           )}
 
+          {/* Preview de proporção */}
+          {proration && (
+            <Card className={proration.action === "upgrade" ? "border-blue-500/40 bg-blue-500/5" : "border-emerald-500/40 bg-emerald-500/5"}>
+              <CardContent className="pt-4 space-y-2 text-sm">
+                <div className="flex items-center gap-2 font-semibold">
+                  {proration.action === "upgrade" ? (
+                    <><ArrowUpCircle className="w-4 h-4 text-blue-500" /> Upgrade detectado</>
+                  ) : (
+                    <><ArrowDownCircle className="w-4 h-4 text-emerald-500" /> Downgrade detectado</>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {proration.details.daysRemaining} dias restantes do ciclo atual ({proration.details.cycleDays}d).
+                  Crédito não usado do plano anterior: {formatBRL(proration.details.unusedCredit)}.
+                  Custo proporcional do novo plano para o período restante: {formatBRL(proration.details.newCostForRemainingDays)}.
+                </p>
+                {proration.action === "upgrade" && (
+                  <div className="space-y-1">
+                    {proration.creditsConsumed > 0 && (
+                      <p className="text-xs">Créditos disponíveis serão abatidos: <span className="font-semibold">{formatBRL(proration.creditsConsumed)}</span></p>
+                    )}
+                    <p className="font-semibold">A cobrar agora: {formatBRL(proration.chargeNow)}</p>
+                    <p className="text-xs text-muted-foreground">Próxima cobrança: {proration.nextBillingDate.toLocaleDateString("pt-BR")}</p>
+                  </div>
+                )}
+                {proration.action === "downgrade" && (
+                  <div className="space-y-1">
+                    <p className="font-semibold text-emerald-600">Crédito gerado: {formatBRL(proration.creditGenerated)}</p>
+                    <p className="text-xs text-muted-foreground">Validade: 12 meses. Será abatido automaticamente em mudanças/futuras faturas.</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Painel de créditos da empresa */}
+          {company && <CompanyCreditsPanel companyId={company.id} refreshKey={creditsRefreshKey} />}
+
           {/* Pending Plan Change (downgrade/upgrade scheduled) */}
           {subscription?.pending_plan_change && (
             <Card className="border-amber-500/40 bg-amber-500/5">

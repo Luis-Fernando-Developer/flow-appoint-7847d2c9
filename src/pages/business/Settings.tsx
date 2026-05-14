@@ -32,6 +32,7 @@ interface Employee {
 
 export default function BusinessSettings() {
   const { slug } = useParams<{ slug: string }>();
+  const navigate = useNavigate();
   const [company, setCompany] = useState<Company | null>(null);
   const [subscription, setSubscription] = useState<any>(null);
   const [employee, setEmployee] = useState<Employee | null>(null);
@@ -346,7 +347,7 @@ export default function BusinessSettings() {
                 <h3 className="font-semibold capitalize">{subscription?.subscription_plans?.name || "Sem Plano"}</h3>
                 <p className="text-sm text-muted-foreground">Status: {subscription?.status || 'Inativo'}</p>
               </div>
-              <Button variant="outline">
+              <Button variant="outline" onClick={() => navigate(`/${slug}/admin/billing`)}>
                 Gerenciar Plano
               </Button>
             </div>

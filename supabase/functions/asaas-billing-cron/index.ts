@@ -41,6 +41,8 @@ Deno.serve(async (req) => {
               billing_period: pending.billing_period,
               original_price: pending.value,
               pending_plan_change: null,
+              // Start 7-day grace period for overage when downgrade is applied
+              overage_grace_until: addDays(new Date(), 7),
             })
             .eq("id", sub.id);
         }

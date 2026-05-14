@@ -4,6 +4,7 @@ import { BusinessSidebar } from "@/components/business/BusinessSidebar";
 import { Button } from "../ui/button";
 import { Copy } from "lucide-react";
 import { User as SupabaseUser } from '@supabase/supabase-js';
+import { PlanOverageBanner } from "@/components/business/PlanOverageBanner";
 
 
 interface BusinessLayoutProps {
@@ -44,6 +45,9 @@ export function BusinessLayout({ children, companySlug, companyName, companyId, 
           
           {/* Main Content */}
           <div className="flex-1 w-full mt-[80px]">
+            <div className="px-4 pt-4">
+              <PlanOverageBanner companyId={companyId} />
+            </div>
             {children}
           </div>
         </main>

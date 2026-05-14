@@ -137,11 +137,14 @@ async function handlePayment(event: string, p: any) {
         .maybeSingle();
       const pending = sub?.pending_plan_change as any;
       if (pending?.plan_id) {
+        const grace = new Date();
+        grace.setDate(grace.getDate() + 7);
         await supabase
           .from("company_subscriptions")
           .update({
             plan_id: pending.plan_id,
             pending_plan_change: null,
+            overage_grace_until: grace.toISOString(),
           })
           .eq("id", subscriptionId);
       }

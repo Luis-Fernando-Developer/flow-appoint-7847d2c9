@@ -9,6 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Plus } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
+import { usePlanLimits } from "@/hooks/usePlanLimits";
 
 interface Service {
   id: string;
@@ -25,6 +26,7 @@ export function AddEmployeeDialog({ companyId, onEmployeeAdded }: AddEmployeeDia
   const [loading, setLoading] = useState(false);
   const [services, setServices] = useState<Service[]>([]);
   const { toast } = useToast();
+  const { guard } = usePlanLimits(companyId);
   
   const [formData, setFormData] = useState({
     name: "",
@@ -58,6 +60,7 @@ export function AddEmployeeDialog({ companyId, onEmployeeAdded }: AddEmployeeDia
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (formData.is_active && !(await guard("employees"))) return;
     setLoading(true);
 
     try {

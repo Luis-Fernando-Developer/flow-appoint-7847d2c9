@@ -122,14 +122,14 @@ export function EditCompanyDialog({ company, open, onOpenChange, onSuccess }: Ed
       .maybeSingle();
     
     if (data) {
-      setSubscription(data);
+      setSubscription(data as Subscription);
       setSelectedPlanId(data.plan_id);
+      setBillingPeriod(data.billing_period || "monthly");
       if (data.discount_percentage > 0) {
         setDescontoEspecial(true);
         setDiscountData({
           percentage: data.discount_percentage,
           cycles: data.discount_cycles_remaining,
-          billingPeriod: data.billing_period
         });
       }
     }

@@ -45,20 +45,28 @@ Deno.serve(async (req) => {
     }
 
     // Create subaccount via Asaas /accounts endpoint
+    const cpfCnpjClean = body.cpf_cnpj.replace(/\D/g, "");
+    const isCnpj = cpfCnpjClean.length === 14;
+    const accountPayload: any = {
+      name: body.name,
+      email: body.email,
+      cpfCnpj: cpfCnpjClean,
+      mobilePhone: body.mobile_phone,
+      address: body.address,
+      addressNumber: body.address_number,
+      province: body.province,
+      postalCode: body.postal_code?.replace(/\D/g, ""),
+      personType: body.person_type || (isCnpj ? "JURIDICA" : "FISICA"),
+      incomeValue: body.income_value ?? 5000,
+    };
+    if (isCnpj) {
+      accountPayload.companyType = body.company_type || "MEI";
+    } else {
+      accountPayload.birthDate = body.birth_date;
+    }
     const created = await asaas<any>(`/accounts`, {
       method: "POST",
-      body: JSON.stringify({
-        name: body.name,
-        email: body.email,
-        cpfCnpj: body.cpf_cnpj.replace(/\D/g, ""),
-        birthDate: body.birth_date,
-        companyType: body.company_type,
-        mobilePhone: body.mobile_phone,
-        address: body.address,
-        addressNumber: body.address_number,
-        province: body.province,
-        postalCode: body.postal_code?.replace(/\D/g, ""),
-      }),
+      body: JSON.stringify(accountPayload),
     });
 
     const payload = {

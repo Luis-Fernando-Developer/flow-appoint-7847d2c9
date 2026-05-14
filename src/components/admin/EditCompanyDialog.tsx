@@ -49,6 +49,8 @@ interface Subscription {
   discount_percentage: number;
   discount_cycles_remaining: number;
   pending_plan_change: any;
+  starts_at: string | null;
+  next_billing_date: string | null;
 }
 
 interface EditCompanyDialogProps {

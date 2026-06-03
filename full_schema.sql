@@ -1,3 +1,4 @@
+SET check_function_bodies = false;
 -- Criar tabelas para o sistema de agendamento
 
 -- Tabela de empresas/estabelecimentos
@@ -158,31 +159,26 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS update_companies_updated_at ON public.companies;
 CREATE TRIGGER update_companies_updated_at
   BEFORE UPDATE ON public.companies
   FOR EACH ROW
   EXECUTE FUNCTION public.update_updated_at_column();
 
-DROP TRIGGER IF EXISTS update_employees_updated_at ON public.employees;
 CREATE TRIGGER update_employees_updated_at
   BEFORE UPDATE ON public.employees
   FOR EACH ROW
   EXECUTE FUNCTION public.update_updated_at_column();
 
-DROP TRIGGER IF EXISTS update_services_updated_at ON public.services;
 CREATE TRIGGER update_services_updated_at
   BEFORE UPDATE ON public.services
   FOR EACH ROW
   EXECUTE FUNCTION public.update_updated_at_column();
 
-DROP TRIGGER IF EXISTS update_clients_updated_at ON public.clients;
 CREATE TRIGGER update_clients_updated_at
   BEFORE UPDATE ON public.clients
   FOR EACH ROW
   EXECUTE FUNCTION public.update_updated_at_column();
 
-DROP TRIGGER IF EXISTS update_bookings_updated_at ON public.bookings;
 CREATE TRIGGER update_bookings_updated_at
   BEFORE UPDATE ON public.bookings
   FOR EACH ROW
@@ -192,10 +188,9 @@ CREATE TRIGGER update_bookings_updated_at
 INSERT INTO public.companies (name, slug, owner_name, owner_email, owner_cpf, status, plan) VALUES
 ('Viking Barbearia', 'viking-barbearia', 'João Silva', 'joao@viking.com', '123.456.789-00', 'active', 'professional'),
 ('Clínica Beleza', 'clinica-beleza', 'Maria Santos', 'maria@beleza.com', '987.654.321-00', 'active', 'enterprise'),
-('Spa Relax', 'spa-relax', 'Ana Costa', 'ana@relax.com', '456.789.123-00', 'active', 'starter');
--- Fix security issues: Set search_path for function
+('Spa Relax', 'spa-relax', 'Ana Costa', 'ana@relax.com', '456.789.123-00', 'active', 'starter');-- Fix security issues: Set search_path for function
 
--- DROP FUNCTION IF EXISTS public.update_updated_at_column();
+DROP FUNCTION IF EXISTS public.update_updated_at_column();
 
 CREATE OR REPLACE FUNCTION public.update_updated_at_column()
 RETURNS TRIGGER AS $$
@@ -203,10 +198,9 @@ BEGIN
   NEW.updated_at = now();
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
--- Fix security issues: Update function with CASCADE
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;-- Fix security issues: Update function with CASCADE
 
--- DROP FUNCTION IF EXISTS public.update_updated_at_column() CASCADE;
+DROP FUNCTION IF EXISTS public.update_updated_at_column() CASCADE;
 
 CREATE OR REPLACE FUNCTION public.update_updated_at_column()
 RETURNS TRIGGER AS $$
@@ -217,36 +211,30 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- Recreate triggers
-DROP TRIGGER IF EXISTS update_companies_updated_at ON public.companies;
 CREATE TRIGGER update_companies_updated_at
   BEFORE UPDATE ON public.companies
   FOR EACH ROW
   EXECUTE FUNCTION public.update_updated_at_column();
 
-DROP TRIGGER IF EXISTS update_employees_updated_at ON public.employees;
 CREATE TRIGGER update_employees_updated_at
   BEFORE UPDATE ON public.employees
   FOR EACH ROW
   EXECUTE FUNCTION public.update_updated_at_column();
 
-DROP TRIGGER IF EXISTS update_services_updated_at ON public.services;
 CREATE TRIGGER update_services_updated_at
   BEFORE UPDATE ON public.services
   FOR EACH ROW
   EXECUTE FUNCTION public.update_updated_at_column();
 
-DROP TRIGGER IF EXISTS update_clients_updated_at ON public.clients;
 CREATE TRIGGER update_clients_updated_at
   BEFORE UPDATE ON public.clients
   FOR EACH ROW
   EXECUTE FUNCTION public.update_updated_at_column();
 
-DROP TRIGGER IF EXISTS update_bookings_updated_at ON public.bookings;
 CREATE TRIGGER update_bookings_updated_at
   BEFORE UPDATE ON public.bookings
   FOR EACH ROW
-  EXECUTE FUNCTION public.update_updated_at_column();
--- Verificar e corrigir a política RLS para INSERT na tabela companies
+  EXECUTE FUNCTION public.update_updated_at_column();-- Verificar e corrigir a política RLS para INSERT na tabela companies
 -- Primeiro, remover a política atual que pode estar causando problemas
 DROP POLICY IF EXISTS "Only authenticated users can insert companies" ON companies;
 
@@ -256,8 +244,7 @@ CREATE POLICY "Authenticated users can insert companies"
 ON companies 
 FOR INSERT 
 TO authenticated
-WITH CHECK (auth.uid() IS NOT NULL);
--- Desabilitar confirmação de email temporariamente para o cadastro funcionar
+WITH CHECK (auth.uid() IS NOT NULL);-- Desabilitar confirmação de email temporariamente para o cadastro funcionar
 -- Vamos criar uma política mais permissiva para companies
 
 -- Primeiro remover todas as políticas atuais
@@ -279,8 +266,7 @@ WITH CHECK (true);
 CREATE POLICY "Company owners can update" 
 ON companies FOR UPDATE 
 USING (true)
-WITH CHECK (true);
--- Corrigir recursão infinita nas políticas RLS da tabela employees
+WITH CHECK (true);-- Corrigir recursão infinita nas políticas RLS da tabela employees
 -- Remover políticas problemáticas primeiro
 DROP POLICY IF EXISTS "Company owners and managers can manage employees" ON employees;
 DROP POLICY IF EXISTS "Employees are viewable by company members" ON employees;
@@ -343,8 +329,7 @@ WITH CHECK (
     WHERE e2.company_id = employees.company_id 
     AND e2.role = 'owner'
   )
-);
--- Create company_customization table to store landing page customizations
+);-- Create company_customization table to store landing page customizations
 CREATE TABLE public.company_customizations (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   company_id UUID NOT NULL,
@@ -423,12 +408,10 @@ USING (
 );
 
 -- Add trigger for updated_at
-DROP TRIGGER IF EXISTS update_company_customizations_updated_at ON public.company_customizations;
 CREATE TRIGGER update_company_customizations_updated_at
 BEFORE UPDATE ON public.company_customizations
 FOR EACH ROW
-EXECUTE FUNCTION public.update_updated_at_column();
--- Adicionar novo valor 'supervisor' ao enum employee_role
+EXECUTE FUNCTION public.update_updated_at_column();-- Adicionar novo valor 'supervisor' ao enum employee_role
 ALTER TYPE employee_role ADD VALUE IF NOT EXISTS 'supervisor';
 
 -- Criar função para verificar níveis de permissão hierárquicos
@@ -468,8 +451,7 @@ AS $$
     AND e.user_id = _user_id
     AND e.is_active = true
   LIMIT 1;
-$$;
--- Adicionar tipo de funcionário na tabela employees
+$$;-- Adicionar tipo de funcionário na tabela employees
 ALTER TABLE public.employees 
 ADD COLUMN employee_type TEXT NOT NULL DEFAULT 'fixo' CHECK (employee_type IN ('autonomo', 'fixo'));
 
@@ -511,8 +493,7 @@ USING (
 
 -- Criar índice para melhor performance
 CREATE INDEX idx_employee_services_employee_id ON public.employee_services(employee_id);
-CREATE INDEX idx_employee_services_service_id ON public.employee_services(service_id);
--- Fix infinite recursion in employees table RLS policies
+CREATE INDEX idx_employee_services_service_id ON public.employee_services(service_id);-- Fix infinite recursion in employees table RLS policies
 -- Drop all existing policies that cause recursion
 DROP POLICY IF EXISTS "Allow insert for new company owners" ON public.employees;
 DROP POLICY IF EXISTS "Company admins can manage employees" ON public.employees;
@@ -560,8 +541,7 @@ FOR ALL USING (
     AND owner.role = 'owner'
     AND owner.is_active = true
   )
-);
--- Fix recursive RLS on employees and allow proper owner/admin access
+);-- Fix recursive RLS on employees and allow proper owner/admin access
 
 -- 1) Ensure RLS is enabled (idempotent)
 ALTER TABLE public.employees ENABLE ROW LEVEL SECURITY;
@@ -612,7 +592,6 @@ WITH CHECK (
 -- 5) Optional: revalidate privileges (no-op but documents intent)
 COMMENT ON POLICY "Company admins can manage employees" ON public.employees IS
   'Uses security definer functions to avoid recursion. Admins manage all; allows first owner insert when none exists.';
-
 -- Fix company_customizations RLS to allow public access to landing pages
 -- Landing pages should be visible to everyone, not just company employees
 
@@ -634,8 +613,7 @@ USING (
 );
 
 -- Keep the admin management policy unchanged
--- "Company admins can manage customizations" should already exist
--- Add logo fields to company_customizations table
+-- "Company admins can manage customizations" should already exist-- Add logo fields to company_customizations table
 ALTER TABLE public.company_customizations 
 ADD COLUMN logo_type text DEFAULT 'url',
 ADD COLUMN logo_url text,
@@ -688,8 +666,7 @@ USING (
 CREATE POLICY "Anyone can view company logos" 
 ON storage.objects 
 FOR SELECT 
-USING (bucket_id = 'company-logos');
--- Fix employee_services RLS policies to allow owners to manage all employee services regardless of their active status
+USING (bucket_id = 'company-logos');-- Fix employee_services RLS policies to allow owners to manage all employee services regardless of their active status
 
 -- Drop existing policies
 DROP POLICY IF EXISTS "Company admins can manage employee services" ON employee_services;
@@ -724,8 +701,7 @@ USING (
     WHERE e.id = employee_services.employee_id 
       AND is_company_admin(e.company_id, auth.uid())
   )
-);
--- Add button color customization columns
+);-- Add button color customization columns
 ALTER TABLE public.company_customizations
 ADD COLUMN IF NOT EXISTS button_color_type text DEFAULT 'solid',
 ADD COLUMN IF NOT EXISTS button_color text DEFAULT 'hsl(251, 91%, 65%)',
@@ -739,8 +715,7 @@ ADD COLUMN IF NOT EXISTS hero_content_position text DEFAULT 'absolute';
 COMMENT ON COLUMN public.company_customizations.button_color_type IS 'Button color type: solid or gradient';
 COMMENT ON COLUMN public.company_customizations.button_color IS 'Solid color for buttons in HSL format';
 COMMENT ON COLUMN public.company_customizations.button_gradient IS 'Gradient settings for buttons';
-COMMENT ON COLUMN public.company_customizations.hero_content_position IS 'Hero content position: absolute (over image), below (under image), or above (before image)';
--- Tabela para armazenar os fluxos de chatbot de cada empresa
+COMMENT ON COLUMN public.company_customizations.hero_content_position IS 'Hero content position: absolute (over image), below (under image), or above (before image)';-- Tabela para armazenar os fluxos de chatbot de cada empresa
 CREATE TABLE public.chatbot_flows (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   company_id UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
@@ -826,18 +801,15 @@ CREATE INDEX idx_chatbot_sessions_client_id ON public.chatbot_sessions(client_id
 CREATE INDEX idx_chatbot_sessions_status ON public.chatbot_sessions(status);
 
 -- Triggers for updated_at
-DROP TRIGGER IF EXISTS update_chatbot_flows_updated_at ON public.chatbot_flows;
 CREATE TRIGGER update_chatbot_flows_updated_at
 BEFORE UPDATE ON public.chatbot_flows
 FOR EACH ROW
 EXECUTE FUNCTION public.update_updated_at_column();
 
-DROP TRIGGER IF EXISTS update_chatbot_sessions_updated_at ON public.chatbot_sessions;
 CREATE TRIGGER update_chatbot_sessions_updated_at
 BEFORE UPDATE ON public.chatbot_sessions
 FOR EACH ROW
-EXECUTE FUNCTION public.update_updated_at_column();
--- Drop the restrictive admin-only policy
+EXECUTE FUNCTION public.update_updated_at_column();-- Drop the restrictive admin-only policy
 DROP POLICY IF EXISTS "Company admins can manage flows" ON public.chatbot_flows;
 
 -- Create a new policy that allows company members to manage flows
@@ -845,8 +817,7 @@ CREATE POLICY "Company members can manage flows"
 ON public.chatbot_flows
 FOR ALL
 USING (public.is_company_member(company_id, auth.uid()))
-WITH CHECK (public.is_company_member(company_id, auth.uid()));
--- Drop the current policy
+WITH CHECK (public.is_company_member(company_id, auth.uid()));-- Drop the current policy
 DROP POLICY IF EXISTS "Company members can manage flows" ON public.chatbot_flows;
 
 -- Create separate policies for better control
@@ -896,8 +867,7 @@ USING (
     WHERE e.company_id = chatbot_flows.company_id
     AND e.user_id = auth.uid()
   )
-);
--- Criar enum para tipos de ausência
+);-- Criar enum para tipos de ausência
 CREATE TYPE absence_type AS ENUM ('vacation', 'day_off', 'sick_leave', 'suspension', 'other');
 
 -- 1. Tabela de horários de funcionamento da empresa
@@ -1123,26 +1093,21 @@ ON public.company_schedule_settings FOR ALL
 USING (is_company_admin(company_id, auth.uid()));
 
 -- Triggers para updated_at
-DROP TRIGGER IF EXISTS update_business_hours_updated_at ON public.business_hours;
 CREATE TRIGGER update_business_hours_updated_at
 BEFORE UPDATE ON public.business_hours
 FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
-DROP TRIGGER IF EXISTS update_employee_schedules_updated_at ON public.employee_schedules;
 CREATE TRIGGER update_employee_schedules_updated_at
 BEFORE UPDATE ON public.employee_schedules
 FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
-DROP TRIGGER IF EXISTS update_employee_absences_updated_at ON public.employee_absences;
 CREATE TRIGGER update_employee_absences_updated_at
 BEFORE UPDATE ON public.employee_absences
 FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
-DROP TRIGGER IF EXISTS update_company_schedule_settings_updated_at ON public.company_schedule_settings;
 CREATE TRIGGER update_company_schedule_settings_updated_at
 BEFORE UPDATE ON public.company_schedule_settings
-FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
--- Atualizar is_company_admin: owners sempre têm acesso, managers precisam estar ativos
+FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();-- Atualizar is_company_admin: owners sempre têm acesso, managers precisam estar ativos
 CREATE OR REPLACE FUNCTION public.is_company_admin(_company_id uuid, _user_id uuid)
 RETURNS boolean
 LANGUAGE sql
@@ -1234,8 +1199,7 @@ AS $$
       e.is_active = true
     )
   LIMIT 1;
-$$;
--- Add new columns to clients table for profile and LGPD compliance
+$$;-- Add new columns to clients table for profile and LGPD compliance
 ALTER TABLE public.clients 
 ADD COLUMN IF NOT EXISTS cpf TEXT,
 ADD COLUMN IF NOT EXISTS address TEXT,
@@ -1253,8 +1217,7 @@ CREATE POLICY "Clients can update their own profile"
 ON public.clients 
 FOR UPDATE 
 USING (auth.uid() = user_id)
-WITH CHECK (auth.uid() = user_id);
--- Create a function to auto-confirm pending bookings after 1 hour
+WITH CHECK (auth.uid() = user_id);-- Create a function to auto-confirm pending bookings after 1 hour
 CREATE OR REPLACE FUNCTION public.auto_confirm_pending_bookings()
 RETURNS void
 LANGUAGE plpgsql
@@ -1284,8 +1247,7 @@ SELECT cron.schedule(
   'auto-confirm-bookings',
   '*/5 * * * *', -- Every 5 minutes
   $$ SELECT public.auto_confirm_pending_bookings() $$
-);
--- Allow clients to update their own bookings (for reschedule)
+);-- Allow clients to update their own bookings (for reschedule)
 CREATE POLICY "Clients can update their own bookings"
 ON public.bookings
 FOR UPDATE
@@ -1305,8 +1267,7 @@ WITH CHECK (
 );
 
 -- Allow clients to cancel their own bookings (update status to cancelled)
--- This is covered by the above policy
--- Tabela de configuração de planos (gerenciada pelo super-admin)
+-- This is covered by the above policy-- Tabela de configuração de planos (gerenciada pelo super-admin)
 CREATE TABLE subscription_plans (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
@@ -1441,8 +1402,7 @@ CREATE POLICY "Clients can manage their own payment methods" ON client_payment_m
 INSERT INTO subscription_plans (name, description, features, monthly_price, quarterly_price, annual_price, is_popular, display_order) VALUES
 ('Starter', 'Ideal para quem está começando', '["Até 50 agendamentos/mês", "1 profissional", "Página personalizada", "Suporte por email"]', 29.00, 78.00, 290.00, false, 1),
 ('Professional', 'Para negócios em crescimento', '["Agendamentos ilimitados", "Até 5 profissionais", "Relatórios básicos", "Suporte prioritário", "Chatbot personalizado"]', 59.00, 159.00, 590.00, true, 2),
-('Enterprise', 'Para grandes estabelecimentos', '["Tudo do Professional", "Profissionais ilimitados", "Relatórios avançados", "API de integração", "Suporte 24/7", "Gerente de conta dedicado"]', 99.00, 269.00, 990.00, false, 3);
--- Adicionar coluna combo_id na tabela bookings
+('Enterprise', 'Para grandes estabelecimentos', '["Tudo do Professional", "Profissionais ilimitados", "Relatórios avançados", "API de integração", "Suporte 24/7", "Gerente de conta dedicado"]', 99.00, 269.00, 990.00, false, 3);-- Adicionar coluna combo_id na tabela bookings
 ALTER TABLE bookings 
 ADD COLUMN combo_id uuid REFERENCES service_combos(id);
 
@@ -1453,10 +1413,8 @@ ALTER COLUMN service_id DROP NOT NULL;
 -- Garantir que ou service_id ou combo_id está preenchido
 ALTER TABLE bookings 
 ADD CONSTRAINT booking_has_service_or_combo 
-CHECK (service_id IS NOT NULL OR combo_id IS NOT NULL);
--- Refresh types - add a comment to chatbot_flows table
-COMMENT ON TABLE public.chatbot_flows IS 'Stores chatbot flow definitions with published versions';
--- Create services table
+CHECK (service_id IS NOT NULL OR combo_id IS NOT NULL);-- Refresh types - add a comment to chatbot_flows table
+COMMENT ON TABLE public.chatbot_flows IS 'Stores chatbot flow definitions with published versions';-- Create services table
 CREATE TABLE IF NOT EXISTS public.services (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   company_id UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
@@ -1628,8 +1586,7 @@ CREATE POLICY "Authenticated users can manage blocked_slots" ON public.blocked_s
 
 -- Create RLS policies for absences
 CREATE POLICY "Anyone can view absences" ON public.absences FOR SELECT USING (true);
-CREATE POLICY "Authenticated users can manage absences" ON public.absences FOR ALL USING (true);
--- Create client_rewards table
+CREATE POLICY "Authenticated users can manage absences" ON public.absences FOR ALL USING (true);-- Create client_rewards table
 CREATE TABLE IF NOT EXISTS public.client_rewards (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   company_id UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
@@ -1745,8 +1702,7 @@ CREATE POLICY "Anyone can view employee_schedules" ON public.employee_schedules 
 CREATE POLICY "Authenticated users can manage employee_schedules" ON public.employee_schedules FOR ALL USING (true);
 
 CREATE POLICY "Anyone can view company_schedule_settings" ON public.company_schedule_settings FOR SELECT USING (true);
-CREATE POLICY "Authenticated users can manage company_schedule_settings" ON public.company_schedule_settings FOR ALL USING (true);
--- Force types refresh by adding comments to all tables
+CREATE POLICY "Authenticated users can manage company_schedule_settings" ON public.company_schedule_settings FOR ALL USING (true);-- Force types refresh by adding comments to all tables
 COMMENT ON TABLE public.services IS 'Business services offered to clients';
 COMMENT ON TABLE public.employees IS 'Business employees who provide services';
 COMMENT ON TABLE public.clients IS 'Client information for bookings';
@@ -1758,8 +1714,7 @@ COMMENT ON TABLE public.employee_schedules IS 'Employee working schedules';
 COMMENT ON TABLE public.employee_availability IS 'Employee specific availability slots';
 COMMENT ON TABLE public.employee_absences IS 'Employee vacation and leave records';
 COMMENT ON TABLE public.blocked_slots IS 'Blocked time slots for scheduling';
-COMMENT ON TABLE public.company_schedule_settings IS 'Company scheduling configuration';
--- Force PostgREST to reload its schema cache
+COMMENT ON TABLE public.company_schedule_settings IS 'Company scheduling configuration';-- Force PostgREST to reload its schema cache
 NOTIFY pgrst, 'reload schema';
 
 -- Ensure the chatbot_flows table has proper constraints
@@ -1780,13 +1735,11 @@ END $$;
 COMMENT ON COLUMN public.chatbot_flows.is_published IS 'Indicates if the chatbot flow is publicly accessible';
 COMMENT ON COLUMN public.chatbot_flows.published_at IS 'Timestamp when the flow was last published';
 COMMENT ON COLUMN public.chatbot_flows.published_containers IS 'Snapshot of containers at publish time';
-COMMENT ON COLUMN public.chatbot_flows.published_edges IS 'Snapshot of edges at publish time';
--- Create unique partial index to ensure no duplicate public_id within the same company
+COMMENT ON COLUMN public.chatbot_flows.published_edges IS 'Snapshot of edges at publish time';-- Create unique partial index to ensure no duplicate public_id within the same company
 -- This allows different companies to have the same public_id, but prevents duplicates within a company
 CREATE UNIQUE INDEX idx_unique_public_id_per_company 
 ON public.chatbot_flows (company_id, public_id) 
-WHERE public_id IS NOT NULL;
--- Tabela de integração com o builder externo (TalkMap)
+WHERE public_id IS NOT NULL;-- Tabela de integração com o builder externo (TalkMap)
 CREATE TABLE public.chatbot_integration (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id uuid NOT NULL UNIQUE,
@@ -1811,7 +1764,6 @@ CREATE POLICY "Authenticated users can manage chatbot_integration"
   ON public.chatbot_integration FOR ALL USING (true) WITH CHECK (true);
 
 -- Trigger de updated_at (reaproveita a função já existente)
-DROP TRIGGER IF EXISTS update_chatbot_integration_updated_at ON public.chatbot_integration;
 CREATE TRIGGER update_chatbot_integration_updated_at
   BEFORE UPDATE ON public.chatbot_integration
   FOR EACH ROW
@@ -1827,9 +1779,7 @@ UPDATE public.subscription_plans
      WHEN jsonb_typeof(features) = 'object' THEN features || '{"chatbot": true}'::jsonb
      WHEN jsonb_typeof(features) = 'array'  THEN jsonb_build_object('chatbot', true, 'list', features)
      ELSE '{"chatbot": true}'::jsonb
-   END;
-CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
-CREATE OR REPLACE FUNCTION public.encrypt_chatbot_key(p_plain text, p_secret text)
+   END;CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;CREATE OR REPLACE FUNCTION public.encrypt_chatbot_key(p_plain text, p_secret text)
 RETURNS text
 LANGUAGE sql
 SECURITY DEFINER
@@ -1851,14 +1801,12 @@ $$;
 REVOKE ALL ON FUNCTION public.encrypt_chatbot_key(text, text) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.decrypt_chatbot_key(text, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.encrypt_chatbot_key(text, text) TO service_role;
-GRANT EXECUTE ON FUNCTION public.decrypt_chatbot_key(text, text) TO service_role;
-ALTER TABLE public.chatbot_integration
+GRANT EXECUTE ON FUNCTION public.decrypt_chatbot_key(text, text) TO service_role;ALTER TABLE public.chatbot_integration
   ADD COLUMN IF NOT EXISTS talkmap_provisioned boolean NOT NULL DEFAULT false,
   ADD COLUMN IF NOT EXISTS talkmap_provisioned_at timestamptz NULL,
   ALTER COLUMN api_key_encrypted DROP NOT NULL,
   ALTER COLUMN api_key_prefix DROP NOT NULL,
   ALTER COLUMN is_active SET DEFAULT false;
-
 ALTER TABLE public.company_customizations
   ADD COLUMN IF NOT EXISTS header_position text DEFAULT 'fixed',
   ADD COLUMN IF NOT EXISTS header_background_type text DEFAULT 'solid',
@@ -1918,7 +1866,6 @@ CREATE POLICY "Authenticated delete company-logos"
   ON storage.objects FOR DELETE
   TO authenticated
   USING (bucket_id = 'company-logos');
-
 ALTER TABLE public.subscription_plans
   ADD COLUMN IF NOT EXISTS builder_tier text NOT NULL DEFAULT 'starter';
 
@@ -1928,7 +1875,6 @@ ALTER TABLE public.companies
 UPDATE public.subscription_plans SET builder_tier = 'starter'  WHERE lower(name) LIKE '%prata%';
 UPDATE public.subscription_plans SET builder_tier = 'pro'      WHERE lower(name) LIKE '%ouro%';
 UPDATE public.subscription_plans SET builder_tier = 'business' WHERE lower(name) LIKE '%diamante%';
-
 -- 1. Colunas extras em company_subscriptions
 ALTER TABLE public.company_subscriptions
   ADD COLUMN IF NOT EXISTS asaas_subscription_id text,
@@ -1980,7 +1926,6 @@ BEGIN
 END;
 $$;
 
-DROP TRIGGER IF EXISTS trg_single_default_pm ON public.company_payment_methods;
 DROP TRIGGER IF EXISTS trg_single_default_pm ON public.company_payment_methods;
 CREATE TRIGGER trg_single_default_pm
   BEFORE INSERT OR UPDATE OF is_default ON public.company_payment_methods
@@ -2060,10 +2005,8 @@ SELECT
   COALESCE(sp.features, '[]'::jsonb)
 FROM public.subscription_plans sp
 ON CONFLICT (plan_id) DO NOTHING;
-
 CREATE EXTENSION IF NOT EXISTS pg_cron WITH SCHEMA extensions;
-CREATE EXTENSION IF NOT EXISTS pg_net WITH SCHEMA extensions;
--- 1. Subconta Asaas por empresa (modo gerenciado)
+CREATE EXTENSION IF NOT EXISTS pg_net WITH SCHEMA extensions;-- 1. Subconta Asaas por empresa (modo gerenciado)
 CREATE TABLE public.company_payment_accounts (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id uuid NOT NULL UNIQUE,
@@ -2153,23 +2096,18 @@ ALTER TABLE public.bookings
   ADD COLUMN IF NOT EXISTS payment_status text NOT NULL DEFAULT 'not_required';
 
 -- 6. Trigger updated_at
-DROP TRIGGER IF EXISTS trg_company_payment_accounts_updated ON public.company_payment_accounts;
 CREATE TRIGGER trg_company_payment_accounts_updated
   BEFORE UPDATE ON public.company_payment_accounts
   FOR EACH ROW EXECUTE FUNCTION public.update_chatbot_updated_at();
 
-DROP TRIGGER IF EXISTS trg_company_payment_settings_updated ON public.company_payment_settings;
 CREATE TRIGGER trg_company_payment_settings_updated
   BEFORE UPDATE ON public.company_payment_settings
   FOR EACH ROW EXECUTE FUNCTION public.update_chatbot_updated_at();
 
-DROP TRIGGER IF EXISTS trg_booking_payments_updated ON public.booking_payments;
 CREATE TRIGGER trg_booking_payments_updated
   BEFORE UPDATE ON public.booking_payments
-  FOR EACH ROW EXECUTE FUNCTION public.update_chatbot_updated_at();
-DROP TABLE IF EXISTS public.company_payment_accounts CASCADE;
-ALTER TABLE public.company_payment_settings DROP COLUMN IF EXISTS platform_fee_percentage;
-CREATE TABLE public.company_credits (
+  FOR EACH ROW EXECUTE FUNCTION public.update_chatbot_updated_at();DROP TABLE IF EXISTS public.company_payment_accounts CASCADE;
+ALTER TABLE public.company_payment_settings DROP COLUMN IF EXISTS platform_fee_percentage;CREATE TABLE public.company_credits (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   company_id UUID NOT NULL,
   amount NUMERIC NOT NULL DEFAULT 0,
@@ -2203,11 +2141,9 @@ ON public.company_credits FOR UPDATE USING (auth.uid() IS NOT NULL);
 CREATE POLICY "Authenticated can delete company_credits"
 ON public.company_credits FOR DELETE USING (auth.uid() IS NOT NULL);
 
-DROP TRIGGER IF EXISTS update_company_credits_updated_at ON public.company_credits;
 CREATE TRIGGER update_company_credits_updated_at
 BEFORE UPDATE ON public.company_credits
-FOR EACH ROW EXECUTE FUNCTION public.update_chatbot_updated_at();
--- 1. Tabela de super admins
+FOR EACH ROW EXECUTE FUNCTION public.update_chatbot_updated_at();-- 1. Tabela de super admins
 CREATE TABLE IF NOT EXISTS public.super_admins (
   user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   note TEXT,
@@ -2276,8 +2212,7 @@ WITH CHECK (public.is_super_admin(auth.uid()));
 
 CREATE POLICY "Super admins delete company credits"
 ON public.company_credits FOR DELETE
-USING (public.is_super_admin(auth.uid()));
--- 1. Update plan_limits with new tier numbers
+USING (public.is_super_admin(auth.uid()));-- 1. Update plan_limits with new tier numbers
 UPDATE public.plan_limits SET
   max_employees = 1, max_services = 3, max_bookings_month = 50,
   max_chatbots = 0, max_chatbot_messages = 0, max_integrations = 0

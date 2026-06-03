@@ -210,10 +210,16 @@ CREATE TRIGGER update_bookings_updated_at
   EXECUTE FUNCTION public.update_updated_at_column();
 
 -- Inserir dados de exemplo
-INSERT INTO public.companies (name, slug, owner_name, owner_email, owner_cpf, status, plan) VALUES
+
+DO $$ BEGIN
+    INSERT INTO public.companies (name, slug, owner_name, owner_email, owner_cpf, status, plan) VALUES
 ('Viking Barbearia', 'viking-barbearia', 'João Silva', 'joao@viking.com', '123.456.789-00', 'active', 'professional'),
 ('Clínica Beleza', 'clinica-beleza', 'Maria Santos', 'maria@beleza.com', '987.654.321-00', 'active', 'enterprise'),
-('Spa Relax', 'spa-relax', 'Ana Costa', 'ana@relax.com', '456.789.123-00', 'active', 'starter'); ON CONFLICT DO NOTHING;
+('Spa Relax', 'spa-relax', 'Ana Costa', 'ana@relax.com', '456.789.123-00', 'active', 'starter');
+EXCEPTION
+    WHEN unique_violation THEN null;
+    WHEN duplicate_object THEN null;
+END $$;
 -- Fix security issues: Set search_path for function
 
 -- DROP FUNCTION IF EXISTS public.update_updated_at_column();
@@ -663,8 +669,14 @@ ADD COLUMN logo_url text,
 ADD COLUMN logo_upload_path text;
 
 -- Create storage bucket for company logos
-INSERT INTO storage.buckets (id, name, public) 
-VALUES ('company-logos', 'company-logos', true); ON CONFLICT DO NOTHING;
+
+DO $$ BEGIN
+    INSERT INTO storage.buckets (id, name, public) 
+VALUES ('company-logos', 'company-logos', true);
+EXCEPTION
+    WHEN unique_violation THEN null;
+    WHEN duplicate_object THEN null;
+END $$;
 
 -- Create RLS policies for company logos bucket
 CREATE POLICY "Company admins can upload logos" 
@@ -1465,10 +1477,16 @@ CREATE POLICY "Clients can manage their own payment methods" ON client_payment_m
 );
 
 -- Inserir planos iniciais
-INSERT INTO subscription_plans (name, description, features, monthly_price, quarterly_price, annual_price, is_popular, display_order) VALUES
+
+DO $$ BEGIN
+    INSERT INTO subscription_plans (name, description, features, monthly_price, quarterly_price, annual_price, is_popular, display_order) VALUES
 ('Starter', 'Ideal para quem está começando', '["Até 50 agendamentos/mês", "1 profissional", "Página personalizada", "Suporte por email"]', 29.00, 78.00, 290.00, false, 1),
 ('Professional', 'Para negócios em crescimento', '["Agendamentos ilimitados", "Até 5 profissionais", "Relatórios básicos", "Suporte prioritário", "Chatbot personalizado"]', 59.00, 159.00, 590.00, true, 2),
-('Enterprise', 'Para grandes estabelecimentos', '["Tudo do Professional", "Profissionais ilimitados", "Relatórios avançados", "API de integração", "Suporte 24/7", "Gerente de conta dedicado"]', 99.00, 269.00, 990.00, false, 3); ON CONFLICT DO NOTHING;
+('Enterprise', 'Para grandes estabelecimentos', '["Tudo do Professional", "Profissionais ilimitados", "Relatórios avançados", "API de integração", "Suporte 24/7", "Gerente de conta dedicado"]', 99.00, 269.00, 990.00, false, 3);
+EXCEPTION
+    WHEN unique_violation THEN null;
+    WHEN duplicate_object THEN null;
+END $$;
 -- Adicionar coluna combo_id na tabela bookings
 ALTER TABLE bookings 
 ADD COLUMN combo_id uuid REFERENCES service_combos(id);
@@ -1923,13 +1941,19 @@ ALTER TABLE public.company_customizations
 ALTER TABLE public.company_customizations
   ADD CONSTRAINT company_customizations_company_id_unique UNIQUE (company_id);
 
-INSERT INTO storage.buckets (id, name, public)
+
+DO $$ BEGIN
+    INSERT INTO storage.buckets (id, name, public)
 VALUES ('company-logos', 'company-logos', true)
 ON CONFLICT (id) DO UPDATE SET public = true;
+EXCEPTION
+    WHEN unique_violation THEN null;
+    WHEN duplicate_object THEN null;
+END $$;
 
 CREATE POLICY "Public read company-logos"
   ON storage.objects FOR SELECT
-  USING (bucket_id = 'company-logos'); ON CONFLICT DO NOTHING;
+  USING (bucket_id = 'company-logos');
 
 CREATE POLICY "Authenticated upload company-logos"
   ON storage.objects FOR INSERT
@@ -2075,7 +2099,9 @@ CREATE POLICY "Authenticated users can manage plan limits"
   WITH CHECK (auth.uid() IS NOT NULL);
 
 -- Seed inicial baseado no builder_tier
-INSERT INTO public.plan_limits (plan_id, max_employees, max_services, max_bookings_month, max_chatbots, max_chatbot_messages, max_integrations, features)
+
+DO $$ BEGIN
+    INSERT INTO public.plan_limits (plan_id, max_employees, max_services, max_bookings_month, max_chatbots, max_chatbot_messages, max_integrations, features)
 SELECT
   sp.id,
   CASE sp.builder_tier WHEN 'starter' THEN 3 WHEN 'pro' THEN 15 WHEN 'business' THEN 100 ELSE 1 END,
@@ -2087,6 +2113,10 @@ SELECT
   COALESCE(sp.features, '[]'::jsonb)
 FROM public.subscription_plans sp
 ON CONFLICT (plan_id) DO NOTHING;
+EXCEPTION
+    WHEN unique_violation THEN null;
+    WHEN duplicate_object THEN null;
+END $$;
 
 CREATE EXTENSION IF NOT EXISTS pg_cron WITH SCHEMA extensions;
 CREATE EXTENSION IF NOT EXISTS pg_net WITH SCHEMA extensions;

@@ -1,16 +1,14 @@
 /**
- * Cliente Supabase que usa as variáveis de ambiente corretas.
- * Este cliente deve ser usado em vez do auto-gerado quando precisamos
- * garantir que estamos conectando ao backend correto do Lovable Cloud.
+ * Supabase client for standalone deployment.
  */
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '@/integrations/supabase/types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseKey) {
-  console.error('Missing Supabase environment variables');
+  console.error('Missing Supabase environment variables (VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY)');
 }
 
 export const supabaseClient = createClient<Database>(

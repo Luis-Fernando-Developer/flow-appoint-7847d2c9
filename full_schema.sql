@@ -1,6 +1,15 @@
 
+-- INDEPENDENT DEPLOYMENT SCHEMA
+-- This script sets up the entire database structure.
 SET check_function_bodies = false;
 SET client_min_messages = warning;
+
+-- Pre-emptive cleanup to avoid dependency issues with the common update function
+DROP TRIGGER IF EXISTS update_companies_updated_at ON public.companies;
+DROP TRIGGER IF EXISTS update_employees_updated_at ON public.employees;
+DROP TRIGGER IF EXISTS update_services_updated_at ON public.services;
+DROP TRIGGER IF EXISTS update_clients_updated_at ON public.clients;
+DROP TRIGGER IF EXISTS update_bookings_updated_at ON public.bookings;
 -- Criar tabelas para o sistema de agendamento
 
 -- Tabela de empresas/estabelecimentos
@@ -25,13 +34,7 @@ CREATE TABLE IF NOT EXISTS public.companies (
 );
 
 -- Tabela de funcionários/colaboradores
-
-DO $$ BEGIN
-    CREATE TYPE public.employee_role AS ENUM ('owner', 'manager', 'supervisor', 'receptionist', 'employee');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
+CREATE TYPE public.employee_role AS ENUM ('owner', 'manager', 'supervisor', 'receptionist', 'employee');
 
 CREATE TABLE IF NOT EXISTS public.employees (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -80,20 +83,8 @@ CREATE TABLE IF NOT EXISTS public.clients (
 );
 
 -- Tabela de agendamentos
-
-DO $$ BEGIN
-    CREATE TYPE public.booking_status AS ENUM ('pending', 'confirmed', 'cancelled', 'completed', 'no_show');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
-
-DO $$ BEGIN
-    CREATE TYPE public.payment_status AS ENUM ('pending', 'confirmed', 'cancelled', 'free');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
+CREATE TYPE public.booking_status AS ENUM ('pending', 'confirmed', 'cancelled', 'completed', 'no_show');
+CREATE TYPE public.payment_status AS ENUM ('pending', 'confirmed', 'cancelled', 'free');
 
 CREATE TABLE IF NOT EXISTS public.bookings (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -210,16 +201,10 @@ CREATE TRIGGER update_bookings_updated_at
   EXECUTE FUNCTION public.update_updated_at_column();
 
 -- Inserir dados de exemplo
-
-DO $$ BEGIN
-    INSERT INTO public.companies (name, slug, owner_name, owner_email, owner_cpf, status, plan) VALUES
+INSERT INTO public.companies (name, slug, owner_name, owner_email, owner_cpf, status, plan) VALUES
 ('Viking Barbearia', 'viking-barbearia', 'João Silva', 'joao@viking.com', '123.456.789-00', 'active', 'professional'),
 ('Clínica Beleza', 'clinica-beleza', 'Maria Santos', 'maria@beleza.com', '987.654.321-00', 'active', 'enterprise'),
 ('Spa Relax', 'spa-relax', 'Ana Costa', 'ana@relax.com', '456.789.123-00', 'active', 'starter');
-EXCEPTION
-    WHEN unique_violation THEN null;
-    WHEN duplicate_object THEN null;
-END $$;
 -- Fix security issues: Set search_path for function
 
 -- DROP FUNCTION IF EXISTS public.update_updated_at_column();
@@ -669,14 +654,8 @@ ADD COLUMN logo_url text,
 ADD COLUMN logo_upload_path text;
 
 -- Create storage bucket for company logos
-
-DO $$ BEGIN
-    INSERT INTO storage.buckets (id, name, public) 
+INSERT INTO storage.buckets (id, name, public) 
 VALUES ('company-logos', 'company-logos', true);
-EXCEPTION
-    WHEN unique_violation THEN null;
-    WHEN duplicate_object THEN null;
-END $$;
 
 -- Create RLS policies for company logos bucket
 CREATE POLICY "Company admins can upload logos" 
@@ -931,13 +910,7 @@ USING (
   )
 );
 -- Criar enum para tipos de ausência
-
-DO $$ BEGIN
-    CREATE TYPE absence_type AS ENUM ('vacation', 'day_off', 'sick_leave', 'suspension', 'other');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
+CREATE TYPE absence_type AS ENUM ('vacation', 'day_off', 'sick_leave', 'suspension', 'other');
 
 -- 1. Tabela de horários de funcionamento da empresa
 CREATE TABLE IF NOT EXISTS public.business_hours (
@@ -1477,16 +1450,10 @@ CREATE POLICY "Clients can manage their own payment methods" ON client_payment_m
 );
 
 -- Inserir planos iniciais
-
-DO $$ BEGIN
-    INSERT INTO subscription_plans (name, description, features, monthly_price, quarterly_price, annual_price, is_popular, display_order) VALUES
+INSERT INTO subscription_plans (name, description, features, monthly_price, quarterly_price, annual_price, is_popular, display_order) VALUES
 ('Starter', 'Ideal para quem está começando', '["Até 50 agendamentos/mês", "1 profissional", "Página personalizada", "Suporte por email"]', 29.00, 78.00, 290.00, false, 1),
 ('Professional', 'Para negócios em crescimento', '["Agendamentos ilimitados", "Até 5 profissionais", "Relatórios básicos", "Suporte prioritário", "Chatbot personalizado"]', 59.00, 159.00, 590.00, true, 2),
 ('Enterprise', 'Para grandes estabelecimentos', '["Tudo do Professional", "Profissionais ilimitados", "Relatórios avançados", "API de integração", "Suporte 24/7", "Gerente de conta dedicado"]', 99.00, 269.00, 990.00, false, 3);
-EXCEPTION
-    WHEN unique_violation THEN null;
-    WHEN duplicate_object THEN null;
-END $$;
 -- Adicionar coluna combo_id na tabela bookings
 ALTER TABLE bookings 
 ADD COLUMN combo_id uuid REFERENCES service_combos(id);
@@ -1502,7 +1469,7 @@ CHECK (service_id IS NOT NULL OR combo_id IS NOT NULL);
 -- Refresh types - add a comment to chatbot_flows table
 COMMENT ON TABLE public.chatbot_flows IS 'Stores chatbot flow definitions with published versions';
 -- Create services table
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.services (
+CREATE TABLE IF NOT EXISTS public.services (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   company_id UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
@@ -1515,7 +1482,7 @@ CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.services (
 );
 
 -- Create employees table
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.employees (
+CREATE TABLE IF NOT EXISTS public.employees (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   company_id UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
   user_id UUID REFERENCES auth.users(id),
@@ -1529,7 +1496,7 @@ CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.employees (
 );
 
 -- Create employee_services junction table
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.employee_services (
+CREATE TABLE IF NOT EXISTS public.employee_services (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   employee_id UUID NOT NULL REFERENCES public.employees(id) ON DELETE CASCADE,
   service_id UUID NOT NULL REFERENCES public.services(id) ON DELETE CASCADE,
@@ -1538,7 +1505,7 @@ CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.employee_services (
 );
 
 -- Create clients table
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.clients (
+CREATE TABLE IF NOT EXISTS public.clients (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   company_id UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
   user_id UUID REFERENCES auth.users(id),
@@ -1552,7 +1519,7 @@ CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.clients (
 );
 
 -- Create bookings table
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.bookings (
+CREATE TABLE IF NOT EXISTS public.bookings (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   company_id UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
   client_id UUID REFERENCES public.clients(id),
@@ -1568,7 +1535,7 @@ CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.bookings (
 );
 
 -- Create service_combos table
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.service_combos (
+CREATE TABLE IF NOT EXISTS public.service_combos (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   company_id UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
@@ -1580,7 +1547,7 @@ CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.service_combos (
 );
 
 -- Create service_combo_items junction table
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.service_combo_items (
+CREATE TABLE IF NOT EXISTS public.service_combo_items (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   combo_id UUID NOT NULL REFERENCES public.service_combos(id) ON DELETE CASCADE,
   service_id UUID NOT NULL REFERENCES public.services(id) ON DELETE CASCADE,
@@ -1589,7 +1556,7 @@ CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.service_combo_items (
 );
 
 -- Create rewards table
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.rewards (
+CREATE TABLE IF NOT EXISTS public.rewards (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   company_id UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
@@ -1601,7 +1568,7 @@ CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.rewards (
 );
 
 -- Create blocked_slots table
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.blocked_slots (
+CREATE TABLE IF NOT EXISTS public.blocked_slots (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   company_id UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
   employee_id UUID REFERENCES public.employees(id) ON DELETE CASCADE,
@@ -1612,7 +1579,7 @@ CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.blocked_slots (
 );
 
 -- Create absences table
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.absences (
+CREATE TABLE IF NOT EXISTS public.absences (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   company_id UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
   employee_id UUID REFERENCES public.employees(id) ON DELETE CASCADE,
@@ -1675,7 +1642,7 @@ CREATE POLICY "Authenticated users can manage blocked_slots" ON public.blocked_s
 CREATE POLICY "Anyone can view absences" ON public.absences FOR SELECT USING (true);
 CREATE POLICY "Authenticated users can manage absences" ON public.absences FOR ALL USING (true);
 -- Create client_rewards table
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.client_rewards (
+CREATE TABLE IF NOT EXISTS public.client_rewards (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   company_id UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
   client_id UUID REFERENCES public.clients(id) ON DELETE CASCADE,
@@ -1691,7 +1658,7 @@ CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.client_rewards (
 );
 
 -- Create employee_absences table (different from absences)
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.employee_absences (
+CREATE TABLE IF NOT EXISTS public.employee_absences (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   company_id UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
   employee_id UUID REFERENCES public.employees(id) ON DELETE CASCADE,
@@ -1703,7 +1670,7 @@ CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.employee_absences (
 );
 
 -- Create employee_availability table
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.employee_availability (
+CREATE TABLE IF NOT EXISTS public.employee_availability (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   company_id UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
   employee_id UUID REFERENCES public.employees(id) ON DELETE CASCADE,
@@ -1716,7 +1683,7 @@ CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.employee_availability (
 );
 
 -- Create business_hours table
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.business_hours (
+CREATE TABLE IF NOT EXISTS public.business_hours (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   company_id UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
   day_of_week INTEGER NOT NULL,
@@ -1730,7 +1697,7 @@ CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.business_hours (
 );
 
 -- Create employee_schedules table
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.employee_schedules (
+CREATE TABLE IF NOT EXISTS public.employee_schedules (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   company_id UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
   employee_id UUID REFERENCES public.employees(id) ON DELETE CASCADE,
@@ -1745,7 +1712,7 @@ CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.employee_schedules (
 );
 
 -- Create company_schedule_settings table
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.company_schedule_settings (
+CREATE TABLE IF NOT EXISTS public.company_schedule_settings (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   company_id UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE UNIQUE,
   min_advance_hours INTEGER DEFAULT 1,
@@ -1941,15 +1908,9 @@ ALTER TABLE public.company_customizations
 ALTER TABLE public.company_customizations
   ADD CONSTRAINT company_customizations_company_id_unique UNIQUE (company_id);
 
-
-DO $$ BEGIN
-    INSERT INTO storage.buckets (id, name, public)
+INSERT INTO storage.buckets (id, name, public)
 VALUES ('company-logos', 'company-logos', true)
 ON CONFLICT (id) DO UPDATE SET public = true;
-EXCEPTION
-    WHEN unique_violation THEN null;
-    WHEN duplicate_object THEN null;
-END $$;
 
 CREATE POLICY "Public read company-logos"
   ON storage.objects FOR SELECT
@@ -1988,7 +1949,7 @@ ALTER TABLE public.company_subscriptions
   ADD COLUMN IF NOT EXISTS current_payment_method_id uuid;
 
 -- 2. Métodos de pagamento da empresa
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.company_payment_methods (
+CREATE TABLE IF NOT EXISTS public.company_payment_methods (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id uuid NOT NULL,
   type text NOT NULL CHECK (type IN ('credit_card','pix','bank_debit')),
@@ -2038,7 +1999,7 @@ CREATE TRIGGER trg_single_default_pm
   FOR EACH ROW EXECUTE FUNCTION public.enforce_single_default_payment_method();
 
 -- 3. Faturas
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.company_invoices (
+CREATE TABLE IF NOT EXISTS public.company_invoices (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id uuid NOT NULL,
   subscription_id uuid,
@@ -2075,7 +2036,7 @@ CREATE POLICY "Authenticated users can manage invoices"
   WITH CHECK (auth.uid() IS NOT NULL);
 
 -- 4. Limites por plano
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.plan_limits (
+CREATE TABLE IF NOT EXISTS public.plan_limits (
   plan_id uuid PRIMARY KEY,
   max_employees int,
   max_services int,
@@ -2099,9 +2060,7 @@ CREATE POLICY "Authenticated users can manage plan limits"
   WITH CHECK (auth.uid() IS NOT NULL);
 
 -- Seed inicial baseado no builder_tier
-
-DO $$ BEGIN
-    INSERT INTO public.plan_limits (plan_id, max_employees, max_services, max_bookings_month, max_chatbots, max_chatbot_messages, max_integrations, features)
+INSERT INTO public.plan_limits (plan_id, max_employees, max_services, max_bookings_month, max_chatbots, max_chatbot_messages, max_integrations, features)
 SELECT
   sp.id,
   CASE sp.builder_tier WHEN 'starter' THEN 3 WHEN 'pro' THEN 15 WHEN 'business' THEN 100 ELSE 1 END,
@@ -2113,10 +2072,6 @@ SELECT
   COALESCE(sp.features, '[]'::jsonb)
 FROM public.subscription_plans sp
 ON CONFLICT (plan_id) DO NOTHING;
-EXCEPTION
-    WHEN unique_violation THEN null;
-    WHEN duplicate_object THEN null;
-END $$;
 
 CREATE EXTENSION IF NOT EXISTS pg_cron WITH SCHEMA extensions;
 CREATE EXTENSION IF NOT EXISTS pg_net WITH SCHEMA extensions;
@@ -2265,7 +2220,7 @@ CREATE TRIGGER update_company_credits_updated_at
 BEFORE UPDATE ON public.company_credits
 FOR EACH ROW EXECUTE FUNCTION public.update_chatbot_updated_at();
 -- 1. Tabela de super admins
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.super_admins (
+CREATE TABLE IF NOT EXISTS public.super_admins (
   user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   note TEXT,
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()

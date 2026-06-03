@@ -12,13 +12,14 @@ Você deve configurar o seu novo projeto no Supabase (`pmczddukpylhdeaemmyv`):
 
 ## 2. Implantação na VPS (via Portainer/Docker)
 
-Os arquivos necessários estão na pasta `deployment/`.
+Os arquivos necessários para o Docker estão na raiz e na pasta `deployment/`.
 
-1. Copie a pasta do projeto para sua VPS.
-2. No Portainer, você pode criar um "Stack" usando o conteúdo do `docker-compose.yml`.
-3. Certifique-se de que o arquivo `.env` na pasta `deployment/` contenha as chaves corretas:
+1. O Portainer agora encontrará automaticamente o `docker-compose.yml` na raiz do repositório.
+2. Certifique-se de definir as variáveis de ambiente no Portainer ou no arquivo `.env` na raiz:
    - `VITE_SUPABASE_URL=https://pmczddukpylhdeaemmyv.supabase.co`
    - `VITE_SUPABASE_ANON_KEY=sb_publishable_1PR6NDccypa2ukxNErqx0Q_zZ59bFlz`
+3. O domínio `booking.zailom.com` já está configurado via labels do Traefik no `docker-compose.yml`.
+4. A rede `zailom-booking` está definida como externa.
 
 ## 3. Implantação das Edge Functions
 

@@ -1,4 +1,4 @@
--- STANDALONE DEPLOYMENT SCHEMA
+-- SCHEMA PARA DEPLOY INDEPENDENTE
 SET check_function_bodies = false;
 SET client_min_messages = warning;
 
@@ -163,26 +163,31 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS update_companies_updated_at ON public.companies;
 CREATE TRIGGER update_companies_updated_at
   BEFORE UPDATE ON public.companies
   FOR EACH ROW
   EXECUTE FUNCTION public.update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_employees_updated_at ON public.employees;
 CREATE TRIGGER update_employees_updated_at
   BEFORE UPDATE ON public.employees
   FOR EACH ROW
   EXECUTE FUNCTION public.update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_services_updated_at ON public.services;
 CREATE TRIGGER update_services_updated_at
   BEFORE UPDATE ON public.services
   FOR EACH ROW
   EXECUTE FUNCTION public.update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_clients_updated_at ON public.clients;
 CREATE TRIGGER update_clients_updated_at
   BEFORE UPDATE ON public.clients
   FOR EACH ROW
   EXECUTE FUNCTION public.update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_bookings_updated_at ON public.bookings;
 CREATE TRIGGER update_bookings_updated_at
   BEFORE UPDATE ON public.bookings
   FOR EACH ROW
@@ -221,26 +226,31 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- Recreate triggers
+DROP TRIGGER IF EXISTS update_companies_updated_at ON public.companies;
 CREATE TRIGGER update_companies_updated_at
   BEFORE UPDATE ON public.companies
   FOR EACH ROW
   EXECUTE FUNCTION public.update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_employees_updated_at ON public.employees;
 CREATE TRIGGER update_employees_updated_at
   BEFORE UPDATE ON public.employees
   FOR EACH ROW
   EXECUTE FUNCTION public.update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_services_updated_at ON public.services;
 CREATE TRIGGER update_services_updated_at
   BEFORE UPDATE ON public.services
   FOR EACH ROW
   EXECUTE FUNCTION public.update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_clients_updated_at ON public.clients;
 CREATE TRIGGER update_clients_updated_at
   BEFORE UPDATE ON public.clients
   FOR EACH ROW
   EXECUTE FUNCTION public.update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_bookings_updated_at ON public.bookings;
 CREATE TRIGGER update_bookings_updated_at
   BEFORE UPDATE ON public.bookings
   FOR EACH ROW
@@ -430,6 +440,7 @@ USING (
 );
 
 -- Add trigger for updated_at
+DROP TRIGGER IF EXISTS update_company_customizations_updated_at ON public.company_customizations;
 CREATE TRIGGER update_company_customizations_updated_at
 BEFORE UPDATE ON public.company_customizations
 FOR EACH ROW
@@ -850,11 +861,13 @@ CREATE INDEX idx_chatbot_sessions_client_id ON public.chatbot_sessions(client_id
 CREATE INDEX idx_chatbot_sessions_status ON public.chatbot_sessions(status);
 
 -- Triggers for updated_at
+DROP TRIGGER IF EXISTS update_chatbot_flows_updated_at ON public.chatbot_flows;
 CREATE TRIGGER update_chatbot_flows_updated_at
 BEFORE UPDATE ON public.chatbot_flows
 FOR EACH ROW
 EXECUTE FUNCTION public.update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_chatbot_sessions_updated_at ON public.chatbot_sessions;
 CREATE TRIGGER update_chatbot_sessions_updated_at
 BEFORE UPDATE ON public.chatbot_sessions
 FOR EACH ROW
@@ -1151,18 +1164,22 @@ ON public.company_schedule_settings FOR ALL
 USING (is_company_admin(company_id, auth.uid()));
 
 -- Triggers para updated_at
+DROP TRIGGER IF EXISTS update_business_hours_updated_at ON public.business_hours;
 CREATE TRIGGER update_business_hours_updated_at
 BEFORE UPDATE ON public.business_hours
 FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_employee_schedules_updated_at ON public.employee_schedules;
 CREATE TRIGGER update_employee_schedules_updated_at
 BEFORE UPDATE ON public.employee_schedules
 FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_employee_absences_updated_at ON public.employee_absences;
 CREATE TRIGGER update_employee_absences_updated_at
 BEFORE UPDATE ON public.employee_absences
 FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_company_schedule_settings_updated_at ON public.company_schedule_settings;
 CREATE TRIGGER update_company_schedule_settings_updated_at
 BEFORE UPDATE ON public.company_schedule_settings
 FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
@@ -1861,6 +1878,7 @@ CREATE POLICY "Authenticated users can manage chatbot_integration"
   ON public.chatbot_integration FOR ALL USING (true) WITH CHECK (true);
 
 -- Trigger de updated_at (reaproveita a função já existente)
+DROP TRIGGER IF EXISTS update_chatbot_integration_updated_at ON public.chatbot_integration;
 CREATE TRIGGER update_chatbot_integration_updated_at
   BEFORE UPDATE ON public.chatbot_integration
   FOR EACH ROW
@@ -2042,6 +2060,7 @@ END;
 $$;
 
 DROP TRIGGER IF EXISTS trg_single_default_pm ON public.company_payment_methods;
+DROP TRIGGER IF EXISTS trg_single_default_pm ON public.company_payment_methods;
 CREATE TRIGGER trg_single_default_pm
   BEFORE INSERT OR UPDATE OF is_default ON public.company_payment_methods
   FOR EACH ROW EXECUTE FUNCTION public.enforce_single_default_payment_method();
@@ -2217,14 +2236,17 @@ ALTER TABLE public.bookings
   ADD COLUMN IF NOT EXISTS payment_status text NOT NULL DEFAULT 'not_required';
 
 -- 6. Trigger updated_at
+DROP TRIGGER IF EXISTS trg_company_payment_accounts_updated ON public.company_payment_accounts;
 CREATE TRIGGER trg_company_payment_accounts_updated
   BEFORE UPDATE ON public.company_payment_accounts
   FOR EACH ROW EXECUTE FUNCTION public.update_chatbot_updated_at();
 
+DROP TRIGGER IF EXISTS trg_company_payment_settings_updated ON public.company_payment_settings;
 CREATE TRIGGER trg_company_payment_settings_updated
   BEFORE UPDATE ON public.company_payment_settings
   FOR EACH ROW EXECUTE FUNCTION public.update_chatbot_updated_at();
 
+DROP TRIGGER IF EXISTS trg_booking_payments_updated ON public.booking_payments;
 CREATE TRIGGER trg_booking_payments_updated
   BEFORE UPDATE ON public.booking_payments
   FOR EACH ROW EXECUTE FUNCTION public.update_chatbot_updated_at();
@@ -2268,6 +2290,7 @@ ON public.company_credits FOR UPDATE USING (auth.uid() IS NOT NULL);
 CREATE POLICY "Authenticated can delete company_credits"
 ON public.company_credits FOR DELETE USING (auth.uid() IS NOT NULL);
 
+DROP TRIGGER IF EXISTS update_company_credits_updated_at ON public.company_credits;
 CREATE TRIGGER update_company_credits_updated_at
 BEFORE UPDATE ON public.company_credits
 FOR EACH ROW EXECUTE FUNCTION public.update_chatbot_updated_at();

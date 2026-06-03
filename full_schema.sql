@@ -1,7 +1,55 @@
--- FINAL BULLETPROOF SCHEMA
+
+-- STANDALONE DEPLOYMENT SCHEMA - VERSION 9 (THE "CORNO" FIX)
 SET check_function_bodies = false;
 SET client_min_messages = warning;
 
+-- EMERGENCY FUNCTION DEFINITION: The migrations reference this but don't define it!
+CREATE OR REPLACE FUNCTION public.update_chatbot_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = now();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- BASE TABLES with all expected columns
+CREATE TABLE IF NOT EXISTS public.companies (
+  id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  name TEXT NOT NULL,
+  slug TEXT NOT NULL UNIQUE,
+  owner_name TEXT NOT NULL DEFAULT '',
+  owner_email TEXT NOT NULL DEFAULT '',
+  owner_cpf TEXT NOT NULL DEFAULT '',
+  cnpj TEXT,
+  phone TEXT,
+  address TEXT,
+  city TEXT,
+  state TEXT,
+  zip_code TEXT,
+  logo_url TEXT,
+  status TEXT NOT NULL DEFAULT 'active',
+  plan TEXT NOT NULL DEFAULT 'starter',
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.chatbot_flows (
+  id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  company_id UUID REFERENCES public.companies(id) ON DELETE CASCADE,
+  name TEXT NOT NULL DEFAULT 'Novo Fluxo',
+  description TEXT,
+  containers JSONB NOT NULL DEFAULT '[]'::jsonb,
+  edges JSONB NOT NULL DEFAULT '[]'::jsonb,
+  variables JSONB NOT NULL DEFAULT '[]'::jsonb,
+  is_active BOOLEAN NOT NULL DEFAULT false,
+  is_published BOOLEAN DEFAULT false,
+  published_at timestamptz,
+  published_containers jsonb DEFAULT '[]'::jsonb,
+  published_edges jsonb DEFAULT '[]'::jsonb,
+  public_id text,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+);
 -- Criar tabelas para o sistema de agendamento
 
 -- Tabela de empresas/estabelecimentos
@@ -19,8 +67,8 @@ CREATE TABLE IF NOT EXISTS public.companies (
   state TEXT,
   zip_code TEXT,
   logo_url TEXT,
-  status TEXT NOT NULL DEFAULT 'active',
-  plan TEXT NOT NULL DEFAULT 'starter',
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'paused', 'blocked')),
+  plan TEXT NOT NULL DEFAULT 'starter' CHECK (plan IN ('starter', 'professional', 'enterprise')),
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );
@@ -747,18 +795,13 @@ COMMENT ON COLUMN public.company_customizations.hero_content_position IS 'Hero c
 -- Tabela para armazenar os fluxos de chatbot de cada empresa
 CREATE TABLE IF NOT EXISTS public.chatbot_flows (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
-  company_id UUID REFERENCES public.companies(id) ON DELETE CASCADE,
+  company_id UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
   name TEXT NOT NULL DEFAULT 'Novo Fluxo',
   description TEXT,
   containers JSONB NOT NULL DEFAULT '[]'::jsonb,
   edges JSONB NOT NULL DEFAULT '[]'::jsonb,
   variables JSONB NOT NULL DEFAULT '[]'::jsonb,
   is_active BOOLEAN NOT NULL DEFAULT false,
-  is_published BOOLEAN DEFAULT false,
-  published_at timestamptz,
-  published_containers jsonb DEFAULT '[]'::jsonb,
-  published_edges jsonb DEFAULT '[]'::jsonb,
-  public_id text,
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );

@@ -189,7 +189,7 @@ INSERT INTO public.companies (name, slug, owner_name, owner_email, owner_cpf, st
 ('Clínica Beleza', 'clinica-beleza', 'Maria Santos', 'maria@beleza.com', '987.654.321-00', 'active', 'enterprise'),
 ('Spa Relax', 'spa-relax', 'Ana Costa', 'ana@relax.com', '456.789.123-00', 'active', 'starter');-- Fix security issues: Set search_path for function
 
-CREATE OR REPLACE FUNCTION public.update_updated_at_column();
+-- DROP FUNCTION IF EXISTS public.update_updated_at_column();
 
 CREATE OR REPLACE FUNCTION public.update_updated_at_column()
 RETURNS TRIGGER AS $$
@@ -199,7 +199,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;-- Fix security issues: Update function with CASCADE
 
-CREATE OR REPLACE FUNCTION public.update_updated_at_column() CASCADE;
+-- DROP FUNCTION IF EXISTS public.update_updated_at_column() CASCADE;
 
 CREATE OR REPLACE FUNCTION public.update_updated_at_column()
 RETURNS TRIGGER AS $$

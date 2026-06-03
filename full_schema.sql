@@ -1,7 +1,34 @@
--- SCHEMA PARA DEPLOY INDEPENDENTE - VERSÃO FINAL
+
+-- STANDALONE DEPLOYMENT SCHEMA - FINAL ROBUST VERSION
 SET check_function_bodies = false;
 SET client_min_messages = warning;
 
+-- EMERGENCY FIX: Ensure chatbot_flows has the expected columns that might be referenced in comments or indices
+DO $$ 
+BEGIN 
+    -- We create the table if it doesn't exist yet so we can add columns to it
+    -- (The later CREATE TABLE in the migration will use IF NOT EXISTS anyway)
+    IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'chatbot_flows' AND table_schema = 'public') THEN
+        CREATE TABLE public.chatbot_flows (id uuid primary key default gen_random_uuid());
+    END IF;
+
+    -- Add columns if missing
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='chatbot_flows' AND column_name='is_published') THEN
+        ALTER TABLE public.chatbot_flows ADD COLUMN is_published boolean DEFAULT false;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='chatbot_flows' AND column_name='published_at') THEN
+        ALTER TABLE public.chatbot_flows ADD COLUMN published_at timestamptz;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='chatbot_flows' AND column_name='published_containers') THEN
+        ALTER TABLE public.chatbot_flows ADD COLUMN published_containers jsonb DEFAULT '[]'::jsonb;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='chatbot_flows' AND column_name='published_edges') THEN
+        ALTER TABLE public.chatbot_flows ADD COLUMN published_edges jsonb DEFAULT '[]'::jsonb;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='chatbot_flows' AND column_name='public_id') THEN
+        ALTER TABLE public.chatbot_flows ADD COLUMN public_id text;
+    END IF;
+END $$;
 -- Criar tabelas para o sistema de agendamento
 
 -- Tabela de empresas/estabelecimentos

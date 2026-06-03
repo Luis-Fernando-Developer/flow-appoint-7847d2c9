@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile
+      args:
+        - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+        - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+    ports:
+      - "8080:80"
+    env_file:
+      - .env
+    restart: always
+
+# Se você precisar rodar algum outro serviço na VPS, adicione aqui.

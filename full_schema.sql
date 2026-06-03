@@ -1,8 +1,8 @@
--- FINAL CLEAN SCHEMA
+-- STANDALONE DEPLOYMENT SCHEMA
 SET check_function_bodies = false;
 SET client_min_messages = warning;
 
--- Migration: 20250831224457_6e539bfe-3e1f-4816-b707-cd86e58e915e.sql
+-- Source: 20250831224457_6e539bfe-3e1f-4816-b707-cd86e58e915e.sql
 -- Criar tabelas para o sistema de agendamento
 
 -- Tabela de empresas/estabelecimentos
@@ -194,10 +194,10 @@ INSERT INTO public.companies (name, slug, owner_name, owner_email, owner_cpf, st
 ('Clínica Beleza', 'clinica-beleza', 'Maria Santos', 'maria@beleza.com', '987.654.321-00', 'active', 'enterprise'),
 ('Spa Relax', 'spa-relax', 'Ana Costa', 'ana@relax.com', '456.789.123-00', 'active', 'starter');
 
--- Migration: 20250831224517_2670eecf-49c7-4235-a4a9-9acc91757bd1.sql
+-- Source: 20250831224517_2670eecf-49c7-4235-a4a9-9acc91757bd1.sql
 -- Fix security issues: Set search_path for function
 
-DROP FUNCTION IF EXISTS public.update_updated_at_column();
+-- DROP FUNCTION IF EXISTS public.update_updated_at_column();
 
 CREATE OR REPLACE FUNCTION public.update_updated_at_column()
 RETURNS TRIGGER AS $$
@@ -207,10 +207,10 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
--- Migration: 20250831224645_6fd30cd0-9ad7-4b8f-96db-1ae100c048e7.sql
+-- Source: 20250831224645_6fd30cd0-9ad7-4b8f-96db-1ae100c048e7.sql
 -- Fix security issues: Update function with CASCADE
 
-DROP FUNCTION IF EXISTS public.update_updated_at_column() CASCADE;
+-- DROP FUNCTION IF EXISTS public.update_updated_at_column() CASCADE;
 
 CREATE OR REPLACE FUNCTION public.update_updated_at_column()
 RETURNS TRIGGER AS $$
@@ -246,7 +246,7 @@ CREATE TRIGGER update_bookings_updated_at
   FOR EACH ROW
   EXECUTE FUNCTION public.update_updated_at_column();
 
--- Migration: 20250902013348_b6b7dfea-940b-4629-8138-e458d3befb31.sql
+-- Source: 20250902013348_b6b7dfea-940b-4629-8138-e458d3befb31.sql
 -- Verificar e corrigir a política RLS para INSERT na tabela companies
 -- Primeiro, remover a política atual que pode estar causando problemas
 DROP POLICY IF EXISTS "Only authenticated users can insert companies" ON companies;
@@ -259,7 +259,7 @@ FOR INSERT
 TO authenticated
 WITH CHECK (auth.uid() IS NOT NULL);
 
--- Migration: 20250902014103_9093bc53-7413-4414-9e0d-9816de867391.sql
+-- Source: 20250902014103_9093bc53-7413-4414-9e0d-9816de867391.sql
 -- Desabilitar confirmação de email temporariamente para o cadastro funcionar
 -- Vamos criar uma política mais permissiva para companies
 
@@ -284,7 +284,7 @@ ON companies FOR UPDATE
 USING (true)
 WITH CHECK (true);
 
--- Migration: 20250903075206_3d8158f4-4b59-4d40-bbb2-240f22a98026.sql
+-- Source: 20250903075206_3d8158f4-4b59-4d40-bbb2-240f22a98026.sql
 -- Corrigir recursão infinita nas políticas RLS da tabela employees
 -- Remover políticas problemáticas primeiro
 DROP POLICY IF EXISTS "Company owners and managers can manage employees" ON employees;
@@ -350,7 +350,7 @@ WITH CHECK (
   )
 );
 
--- Migration: 20250906083534_be575f07-d6c6-483c-9c2b-3abd48bd860d.sql
+-- Source: 20250906083534_be575f07-d6c6-483c-9c2b-3abd48bd860d.sql
 -- Create company_customization table to store landing page customizations
 CREATE TABLE public.company_customizations (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -435,7 +435,7 @@ BEFORE UPDATE ON public.company_customizations
 FOR EACH ROW
 EXECUTE FUNCTION public.update_updated_at_column();
 
--- Migration: 20250910203433_9c6c0e96-188e-45c8-8c43-db94e9e56f91.sql
+-- Source: 20250910203433_9c6c0e96-188e-45c8-8c43-db94e9e56f91.sql
 -- Adicionar novo valor 'supervisor' ao enum employee_role
 ALTER TYPE employee_role ADD VALUE IF NOT EXISTS 'supervisor';
 
@@ -478,7 +478,7 @@ AS $$
   LIMIT 1;
 $$;
 
--- Migration: 20250910205012_ac0ead3b-a5ee-4ccc-b821-df1023a88ca8.sql
+-- Source: 20250910205012_ac0ead3b-a5ee-4ccc-b821-df1023a88ca8.sql
 -- Adicionar tipo de funcionário na tabela employees
 ALTER TABLE public.employees 
 ADD COLUMN employee_type TEXT NOT NULL DEFAULT 'fixo' CHECK (employee_type IN ('autonomo', 'fixo'));
@@ -523,7 +523,7 @@ USING (
 CREATE INDEX idx_employee_services_employee_id ON public.employee_services(employee_id);
 CREATE INDEX idx_employee_services_service_id ON public.employee_services(service_id);
 
--- Migration: 20250926180014_99080b5e-80e6-46cf-a9fb-b52be7095c95.sql
+-- Source: 20250926180014_99080b5e-80e6-46cf-a9fb-b52be7095c95.sql
 -- Fix infinite recursion in employees table RLS policies
 -- Drop all existing policies that cause recursion
 DROP POLICY IF EXISTS "Allow insert for new company owners" ON public.employees;
@@ -574,7 +574,7 @@ FOR ALL USING (
   )
 );
 
--- Migration: 20250926184138_240c5280-326b-43fd-a2a5-33bfd2bea062.sql
+-- Source: 20250926184138_240c5280-326b-43fd-a2a5-33bfd2bea062.sql
 -- Fix recursive RLS on employees and allow proper owner/admin access
 
 -- 1) Ensure RLS is enabled (idempotent)
@@ -628,7 +628,7 @@ COMMENT ON POLICY "Company admins can manage employees" ON public.employees IS
   'Uses security definer functions to avoid recursion. Admins manage all; allows first owner insert when none exists.';
 
 
--- Migration: 20250926184839_ce6f5bdd-139f-447d-a421-5c33732f94ac.sql
+-- Source: 20250926184839_ce6f5bdd-139f-447d-a421-5c33732f94ac.sql
 -- Fix company_customizations RLS to allow public access to landing pages
 -- Landing pages should be visible to everyone, not just company employees
 
@@ -652,7 +652,7 @@ USING (
 -- Keep the admin management policy unchanged
 -- "Company admins can manage customizations" should already exist
 
--- Migration: 20250926200612_3e940c6a-1d1c-4846-a968-278da5a349e1.sql
+-- Source: 20250926200612_3e940c6a-1d1c-4846-a968-278da5a349e1.sql
 -- Add logo fields to company_customizations table
 ALTER TABLE public.company_customizations 
 ADD COLUMN logo_type text DEFAULT 'url',
@@ -708,7 +708,7 @@ ON storage.objects
 FOR SELECT 
 USING (bucket_id = 'company-logos');
 
--- Migration: 20250926211005_d446a94b-c7a1-4da5-816c-4cc10f7b9882.sql
+-- Source: 20250926211005_d446a94b-c7a1-4da5-816c-4cc10f7b9882.sql
 -- Fix employee_services RLS policies to allow owners to manage all employee services regardless of their active status
 
 -- Drop existing policies
@@ -746,7 +746,7 @@ USING (
   )
 );
 
--- Migration: 20251001214737_41e09185-dc1c-412d-9050-6edabd725c5a.sql
+-- Source: 20251001214737_41e09185-dc1c-412d-9050-6edabd725c5a.sql
 -- Add button color customization columns
 ALTER TABLE public.company_customizations
 ADD COLUMN IF NOT EXISTS button_color_type text DEFAULT 'solid',
@@ -763,7 +763,7 @@ COMMENT ON COLUMN public.company_customizations.button_color IS 'Solid color for
 COMMENT ON COLUMN public.company_customizations.button_gradient IS 'Gradient settings for buttons';
 COMMENT ON COLUMN public.company_customizations.hero_content_position IS 'Hero content position: absolute (over image), below (under image), or above (before image)';
 
--- Migration: 20251204204913_c40d8297-625b-439a-b125-328128926b64.sql
+-- Source: 20251204204913_c40d8297-625b-439a-b125-328128926b64.sql
 -- Tabela para armazenar os fluxos de chatbot de cada empresa
 CREATE TABLE public.chatbot_flows (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -860,7 +860,7 @@ BEFORE UPDATE ON public.chatbot_sessions
 FOR EACH ROW
 EXECUTE FUNCTION public.update_updated_at_column();
 
--- Migration: 20251204211729_5c3f66e2-f8cc-4a88-9268-3596193c4e1e.sql
+-- Source: 20251204211729_5c3f66e2-f8cc-4a88-9268-3596193c4e1e.sql
 -- Drop the restrictive admin-only policy
 DROP POLICY IF EXISTS "Company admins can manage flows" ON public.chatbot_flows;
 
@@ -871,7 +871,7 @@ FOR ALL
 USING (public.is_company_member(company_id, auth.uid()))
 WITH CHECK (public.is_company_member(company_id, auth.uid()));
 
--- Migration: 20251204211952_1ee40138-67e1-46d3-bcf9-9aaa2c5952d2.sql
+-- Source: 20251204211952_1ee40138-67e1-46d3-bcf9-9aaa2c5952d2.sql
 -- Drop the current policy
 DROP POLICY IF EXISTS "Company members can manage flows" ON public.chatbot_flows;
 
@@ -924,7 +924,7 @@ USING (
   )
 );
 
--- Migration: 20251210010253_0355b00c-cf1d-4f00-9e98-974ee11aebf7.sql
+-- Source: 20251210010253_0355b00c-cf1d-4f00-9e98-974ee11aebf7.sql
 -- Criar enum para tipos de ausência
 CREATE TYPE absence_type AS ENUM ('vacation', 'day_off', 'sick_leave', 'suspension', 'other');
 
@@ -1167,7 +1167,7 @@ CREATE TRIGGER update_company_schedule_settings_updated_at
 BEFORE UPDATE ON public.company_schedule_settings
 FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
--- Migration: 20251210035138_297bd745-5f57-432f-b13c-dcb9b7ecd7ff.sql
+-- Source: 20251210035138_297bd745-5f57-432f-b13c-dcb9b7ecd7ff.sql
 -- Atualizar is_company_admin: owners sempre têm acesso, managers precisam estar ativos
 CREATE OR REPLACE FUNCTION public.is_company_admin(_company_id uuid, _user_id uuid)
 RETURNS boolean
@@ -1262,7 +1262,7 @@ AS $$
   LIMIT 1;
 $$;
 
--- Migration: 20251211224738_3e8644cd-ac42-4e80-8414-57115c0102be.sql
+-- Source: 20251211224738_3e8644cd-ac42-4e80-8414-57115c0102be.sql
 -- Add new columns to clients table for profile and LGPD compliance
 ALTER TABLE public.clients 
 ADD COLUMN IF NOT EXISTS cpf TEXT,
@@ -1283,7 +1283,7 @@ FOR UPDATE
 USING (auth.uid() = user_id)
 WITH CHECK (auth.uid() = user_id);
 
--- Migration: 20251211234325_fa742121-df44-4cbc-81c2-a7e52c791b6c.sql
+-- Source: 20251211234325_fa742121-df44-4cbc-81c2-a7e52c791b6c.sql
 -- Create a function to auto-confirm pending bookings after 1 hour
 CREATE OR REPLACE FUNCTION public.auto_confirm_pending_bookings()
 RETURNS void
@@ -1316,7 +1316,7 @@ SELECT cron.schedule(
   $$ SELECT public.auto_confirm_pending_bookings() $$
 );
 
--- Migration: 20251211234733_d7302570-442c-427d-bcfb-ed23b03e4df5.sql
+-- Source: 20251211234733_d7302570-442c-427d-bcfb-ed23b03e4df5.sql
 -- Allow clients to update their own bookings (for reschedule)
 CREATE POLICY "Clients can update their own bookings"
 ON public.bookings
@@ -1339,7 +1339,7 @@ WITH CHECK (
 -- Allow clients to cancel their own bookings (update status to cancelled)
 -- This is covered by the above policy
 
--- Migration: 20251215221823_4a46455a-a7ee-4024-bf56-8f7c589fbc59.sql
+-- Source: 20251215221823_4a46455a-a7ee-4024-bf56-8f7c589fbc59.sql
 -- Tabela de configuração de planos (gerenciada pelo super-admin)
 CREATE TABLE subscription_plans (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -1477,7 +1477,7 @@ INSERT INTO subscription_plans (name, description, features, monthly_price, quar
 ('Professional', 'Para negócios em crescimento', '["Agendamentos ilimitados", "Até 5 profissionais", "Relatórios básicos", "Suporte prioritário", "Chatbot personalizado"]', 59.00, 159.00, 590.00, true, 2),
 ('Enterprise', 'Para grandes estabelecimentos', '["Tudo do Professional", "Profissionais ilimitados", "Relatórios avançados", "API de integração", "Suporte 24/7", "Gerente de conta dedicado"]', 99.00, 269.00, 990.00, false, 3);
 
--- Migration: 20260104011756_f44b38a0-ea45-45b3-9cb5-557c187aa797.sql
+-- Source: 20260104011756_f44b38a0-ea45-45b3-9cb5-557c187aa797.sql
 -- Adicionar coluna combo_id na tabela bookings
 ALTER TABLE bookings 
 ADD COLUMN combo_id uuid REFERENCES service_combos(id);
@@ -1491,11 +1491,11 @@ ALTER TABLE bookings
 ADD CONSTRAINT booking_has_service_or_combo 
 CHECK (service_id IS NOT NULL OR combo_id IS NOT NULL);
 
--- Migration: 20260113002019_e640b29e-092f-439b-b168-30e4a6033cc6.sql
+-- Source: 20260113002019_e640b29e-092f-439b-b168-30e4a6033cc6.sql
 -- Refresh types - add a comment to chatbot_flows table
 COMMENT ON TABLE public.chatbot_flows IS 'Stores chatbot flow definitions with published versions';
 
--- Migration: 20260113002127_dbf4901b-5196-4df6-b018-90c47bbaabe3.sql
+-- Source: 20260113002127_dbf4901b-5196-4df6-b018-90c47bbaabe3.sql
 -- Create services table
 CREATE TABLE IF NOT EXISTS public.services (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -1670,7 +1670,7 @@ CREATE POLICY "Authenticated users can manage blocked_slots" ON public.blocked_s
 CREATE POLICY "Anyone can view absences" ON public.absences FOR SELECT USING (true);
 CREATE POLICY "Authenticated users can manage absences" ON public.absences FOR ALL USING (true);
 
--- Migration: 20260113002218_f0b7ca66-5268-4754-8327-a0dda781bdf8.sql
+-- Source: 20260113002218_f0b7ca66-5268-4754-8327-a0dda781bdf8.sql
 -- Create client_rewards table
 CREATE TABLE IF NOT EXISTS public.client_rewards (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -1789,7 +1789,7 @@ CREATE POLICY "Authenticated users can manage employee_schedules" ON public.empl
 CREATE POLICY "Anyone can view company_schedule_settings" ON public.company_schedule_settings FOR SELECT USING (true);
 CREATE POLICY "Authenticated users can manage company_schedule_settings" ON public.company_schedule_settings FOR ALL USING (true);
 
--- Migration: 20260113002420_eda56b14-1645-4435-bd6e-af95115d392b.sql
+-- Source: 20260113002420_eda56b14-1645-4435-bd6e-af95115d392b.sql
 -- Force types refresh by adding comments to all tables
 COMMENT ON TABLE public.services IS 'Business services offered to clients';
 COMMENT ON TABLE public.employees IS 'Business employees who provide services';
@@ -1804,7 +1804,7 @@ COMMENT ON TABLE public.employee_absences IS 'Employee vacation and leave record
 COMMENT ON TABLE public.blocked_slots IS 'Blocked time slots for scheduling';
 COMMENT ON TABLE public.company_schedule_settings IS 'Company scheduling configuration';
 
--- Migration: 20260113002958_85f30cd6-1df4-4173-b21f-ddb01e377408.sql
+-- Source: 20260113002958_85f30cd6-1df4-4173-b21f-ddb01e377408.sql
 -- Force PostgREST to reload its schema cache
 NOTIFY pgrst, 'reload schema';
 
@@ -1828,14 +1828,14 @@ COMMENT ON COLUMN public.chatbot_flows.published_at IS 'Timestamp when the flow 
 COMMENT ON COLUMN public.chatbot_flows.published_containers IS 'Snapshot of containers at publish time';
 COMMENT ON COLUMN public.chatbot_flows.published_edges IS 'Snapshot of edges at publish time';
 
--- Migration: 20260113152458_54650973-ffa2-45c0-add7-09d13528c1a6.sql
+-- Source: 20260113152458_54650973-ffa2-45c0-add7-09d13528c1a6.sql
 -- Create unique partial index to ensure no duplicate public_id within the same company
 -- This allows different companies to have the same public_id, but prevents duplicates within a company
 CREATE UNIQUE INDEX idx_unique_public_id_per_company 
 ON public.chatbot_flows (company_id, public_id) 
 WHERE public_id IS NOT NULL;
 
--- Migration: 20260427181216_2e8ac498-b234-44b2-9874-f642e81e6ab0.sql
+-- Source: 20260427181216_2e8ac498-b234-44b2-9874-f642e81e6ab0.sql
 -- Tabela de integração com o builder externo (TalkMap)
 CREATE TABLE public.chatbot_integration (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -1878,10 +1878,10 @@ UPDATE public.subscription_plans
      ELSE '{"chatbot": true}'::jsonb
    END;
 
--- Migration: 20260427181441_c3564c36-d788-48b0-a2d4-cb148f0e1f1f.sql
+-- Source: 20260427181441_c3564c36-d788-48b0-a2d4-cb148f0e1f1f.sql
 CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
 
--- Migration: 20260427182207_6c4c65cf-113e-4e81-b149-476330f96509.sql
+-- Source: 20260427182207_6c4c65cf-113e-4e81-b149-476330f96509.sql
 CREATE OR REPLACE FUNCTION public.encrypt_chatbot_key(p_plain text, p_secret text)
 RETURNS text
 LANGUAGE sql
@@ -1906,7 +1906,7 @@ REVOKE ALL ON FUNCTION public.decrypt_chatbot_key(text, text) FROM PUBLIC, anon,
 GRANT EXECUTE ON FUNCTION public.encrypt_chatbot_key(text, text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.decrypt_chatbot_key(text, text) TO service_role;
 
--- Migration: 20260430165341_b2d9bd3a-83ac-439d-bef1-a34cc8259f17.sql
+-- Source: 20260430165341_b2d9bd3a-83ac-439d-bef1-a34cc8259f17.sql
 ALTER TABLE public.chatbot_integration
   ADD COLUMN IF NOT EXISTS talkmap_provisioned boolean NOT NULL DEFAULT false,
   ADD COLUMN IF NOT EXISTS talkmap_provisioned_at timestamptz NULL,
@@ -1914,7 +1914,7 @@ ALTER TABLE public.chatbot_integration
   ALTER COLUMN api_key_prefix DROP NOT NULL,
   ALTER COLUMN is_active SET DEFAULT false;
 
--- Migration: 20260510223059_cf067641-13b9-49c4-8d82-4a11903d64b6.sql
+-- Source: 20260510223059_cf067641-13b9-49c4-8d82-4a11903d64b6.sql
 
 ALTER TABLE public.company_customizations
   ADD COLUMN IF NOT EXISTS header_position text DEFAULT 'fixed',
@@ -1977,7 +1977,7 @@ CREATE POLICY "Authenticated delete company-logos"
   USING (bucket_id = 'company-logos');
 
 
--- Migration: 20260513233913_f86bcfd8-118d-4648-b139-c2c300f45e9c.sql
+-- Source: 20260513233913_f86bcfd8-118d-4648-b139-c2c300f45e9c.sql
 ALTER TABLE public.subscription_plans
   ADD COLUMN IF NOT EXISTS builder_tier text NOT NULL DEFAULT 'starter';
 
@@ -1988,7 +1988,7 @@ UPDATE public.subscription_plans SET builder_tier = 'starter'  WHERE lower(name)
 UPDATE public.subscription_plans SET builder_tier = 'pro'      WHERE lower(name) LIKE '%ouro%';
 UPDATE public.subscription_plans SET builder_tier = 'business' WHERE lower(name) LIKE '%diamante%';
 
--- Migration: 20260514003107_1e3271d2-a086-4e8b-bffe-95c9373da475.sql
+-- Source: 20260514003107_1e3271d2-a086-4e8b-bffe-95c9373da475.sql
 
 -- 1. Colunas extras em company_subscriptions
 ALTER TABLE public.company_subscriptions
@@ -2122,11 +2122,11 @@ FROM public.subscription_plans sp
 ON CONFLICT (plan_id) DO NOTHING;
 
 
--- Migration: 20260514013246_b33bc952-ad91-433f-99fc-4058bb2c0823.sql
+-- Source: 20260514013246_b33bc952-ad91-433f-99fc-4058bb2c0823.sql
 CREATE EXTENSION IF NOT EXISTS pg_cron WITH SCHEMA extensions;
 CREATE EXTENSION IF NOT EXISTS pg_net WITH SCHEMA extensions;
 
--- Migration: 20260514023911_7ef6a5b8-5dca-4f92-99c7-dd2bab6c4e78.sql
+-- Source: 20260514023911_7ef6a5b8-5dca-4f92-99c7-dd2bab6c4e78.sql
 -- 1. Subconta Asaas por empresa (modo gerenciado)
 CREATE TABLE public.company_payment_accounts (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -2229,11 +2229,11 @@ CREATE TRIGGER trg_booking_payments_updated
   BEFORE UPDATE ON public.booking_payments
   FOR EACH ROW EXECUTE FUNCTION public.update_chatbot_updated_at();
 
--- Migration: 20260514122245_a9eac89c-0c52-4cfc-b29b-a6260af219bc.sql
+-- Source: 20260514122245_a9eac89c-0c52-4cfc-b29b-a6260af219bc.sql
 DROP TABLE IF EXISTS public.company_payment_accounts CASCADE;
 ALTER TABLE public.company_payment_settings DROP COLUMN IF EXISTS platform_fee_percentage;
 
--- Migration: 20260514134227_c642a7b3-0805-4e0b-8d49-7a4049014c7c.sql
+-- Source: 20260514134227_c642a7b3-0805-4e0b-8d49-7a4049014c7c.sql
 CREATE TABLE public.company_credits (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   company_id UUID NOT NULL,
@@ -2272,7 +2272,7 @@ CREATE TRIGGER update_company_credits_updated_at
 BEFORE UPDATE ON public.company_credits
 FOR EACH ROW EXECUTE FUNCTION public.update_chatbot_updated_at();
 
--- Migration: 20260514135432_7c9c53e3-015a-413c-ac39-d78b46ea34b9.sql
+-- Source: 20260514135432_7c9c53e3-015a-413c-ac39-d78b46ea34b9.sql
 -- 1. Tabela de super admins
 CREATE TABLE IF NOT EXISTS public.super_admins (
   user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -2344,7 +2344,7 @@ CREATE POLICY "Super admins delete company credits"
 ON public.company_credits FOR DELETE
 USING (public.is_super_admin(auth.uid()));
 
--- Migration: 20260514165056_bafdd6b2-87dd-425d-a934-7557d4080fd3.sql
+-- Source: 20260514165056_bafdd6b2-87dd-425d-a934-7557d4080fd3.sql
 -- 1. Update plan_limits with new tier numbers
 UPDATE public.plan_limits SET
   max_employees = 1, max_services = 3, max_bookings_month = 50,

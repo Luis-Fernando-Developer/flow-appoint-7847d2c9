@@ -1,36 +1,50 @@
-# Guia de Migração para Supabase Externo e VPS
+# Guia de Migração para Independência Total (VPS + Supabase Externo)
 
-Este projeto foi preparado para ser hospedado fora da infraestrutura do Lovable Cloud.
+Este projeto foi desconectado da infraestrutura do Lovable Cloud e está pronto para ser hospedado de forma independente.
 
 ## 1. Migração do Banco de Dados (Supabase Externo)
 
-Você deve configurar o seu novo projeto no Supabase (`pmczddukpylhdeaemmyv`):
+Seu projeto Supabase: `pmczddukpylhdeaemmyv`
 
-1. Acesse o SQL Editor no painel do Supabase.
-2. Copie o conteúdo do arquivo `full_schema.sql` (gerado na raiz do projeto) e execute-o. Isso criará todas as tabelas, políticas (RLS), funções e gatilhos.
-3. **Importante**: Você precisará configurar manualmente as Secrets (variáveis de ambiente) no painel do Supabase em **Edge Functions > Secrets** para que as funções funcionem corretamente. Exemplos: `ASAAS_API_KEY`, `BUILDER_API_KEY`, etc.
+1. **Criar Estrutura**:
+   - Localize o arquivo `full_schema.sql` na raiz do seu repositório.
+   - Abra o painel do Supabase > **SQL Editor** > **New Query**.
+   - Cole todo o conteúdo do `full_schema.sql` e clique em **Run**.
+   - Isso criará todas as tabelas, RLS, triggers e buckets de storage.
 
-## 2. Implantação na VPS (via Portainer/Docker)
+2. **Configurar Secrets (Edge Functions)**:
+   - No painel do Supabase, vá em **Edge Functions** > **Manage Secrets**.
+   - Adicione todas as chaves necessárias (ex: `ASAAS_API_KEY`, `CHATBOT_KEY_ENCRYPTION_SECRET`, `EMBED_SHARED_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`).
+   - Sem isso, as automações de pagamento e chatbot não funcionarão.
 
-Os arquivos necessários para o Docker estão na raiz e na pasta `deployment/`.
+## 2. Implantação na VPS (via Portainer)
 
-1. O Portainer agora encontrará automaticamente o `docker-compose.yml` na raiz do repositório.
-2. Certifique-se de definir as variáveis de ambiente no Portainer ou no arquivo `.env` na raiz:
-   - `VITE_SUPABASE_URL=https://pmczddukpylhdeaemmyv.supabase.co`
-   - `VITE_SUPABASE_ANON_KEY=sb_publishable_1PR6NDccypa2ukxNErqx0Q_zZ59bFlz`
-3. O domínio `booking.zailom.com` já está configurado via labels do Traefik no `docker-compose.yml`.
-4. A rede `zailom-booking` está definida como externa.
+1. **Stack no Portainer**:
+   - Use o repositório GitHub: `https://github.com/MestreDaIa/flow-appoint.git`
+   - O Portainer lerá o arquivo `docker-compose.yml` na raiz.
+   
+2. **Variáveis de Ambiente (Vite)**:
+   - No Portainer, na aba **Environment variables**, adicione:
+     - `VITE_SUPABASE_URL`: `https://pmczddukpylhdeaemmyv.supabase.co`
+     - `VITE_SUPABASE_ANON_KEY`: `sb_publishable_1PR6NDccypa2ukxNErqx0Q_zZ59bFlz`
+   - Essas variáveis são injetadas durante o build da imagem Docker.
 
-## 3. Implantação das Edge Functions
+3. **Rede e Domínio**:
+   - Certifique-se de que a rede `zailom-booking` existe no seu Docker (o `docker-compose` espera que ela seja externa).
+   - O domínio configurado é `booking.zailom.com`.
 
-Como você não está mais no Lovable Cloud, as Edge Functions devem ser enviadas para o seu Supabase via CLI:
+## 3. Edge Functions (Deploy Manual)
 
-1. Instale o Supabase CLI localmente.
-2. Faça login: `supabase login`
-3. Link o projeto: `supabase link --project-ref pmczddukpylhdeaemmyv`
-4. Deploy: `supabase functions deploy` (isso enviará todas as funções da pasta `supabase/functions`)
+As funções residem em `supabase/functions/`. Como você não usa mais o deploy automático do Lovable:
 
-## 4. Configurações Finais
+1. Instale o [Supabase CLI](https://supabase.com/docs/guides/cli) na sua máquina.
+2. `supabase login`
+3. `supabase link --project-ref pmczddukpylhdeaemmyv`
+4. `supabase functions deploy`
 
-- **Auth**: Configure os domínios permitidos (Site URL e Redirect URLs) no painel do Supabase em **Authentication > URL Configuration**.
-- **CORS**: Se encontrar erros de CORS nas Edge Functions, verifique as configurações no painel do Supabase.
+## 4. Autenticação e Storage
+
+- **Auth**: No painel do Supabase (**Authentication > URL Configuration**), atualize o "Site URL" para `https://booking.zailom.com`.
+- **Storage**: As políticas foram migradas no passo 1, mas verifique em **Storage** se os buckets (ex: `company-assets`) aparecem corretamente.
+
+O arquivo `.lovable/` foi removido para garantir que o projeto não tenha dependências ocultas.

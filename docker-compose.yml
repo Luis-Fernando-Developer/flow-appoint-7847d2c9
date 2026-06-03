@@ -3,7 +3,7 @@ version: '3.8'
 services:
   frontend:
     build:
-      context: ./
+      context: .
       dockerfile: deployment/Dockerfile
       args:
         - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
@@ -22,3 +22,4 @@ services:
 networks:
   zailom-booking:
     external: true
+

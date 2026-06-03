@@ -1,13 +1,23 @@
 
--- STANDALONE DEPLOYMENT SCHEMA - VERSION 6 (ULTRA ROBUST)
+-- STANDALONE DEPLOYMENT SCHEMA - VERSION 7 (BASE TABLE FIX)
 SET check_function_bodies = false;
 SET client_min_messages = warning;
 
--- Pre-emptively create the table and its missing columns to avoid dependency errors later
-CREATE TABLE IF NOT EXISTS public.chatbot_flows (
-  id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY
+-- First, ensure the most fundamental table exists
+CREATE TABLE IF NOT EXISTS public.companies (
+    id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+    name TEXT,
+    slug TEXT UNIQUE,
+    owner_email TEXT
 );
 
+-- Then create chatbot_flows with the necessary relation
+CREATE TABLE IF NOT EXISTS public.chatbot_flows (
+  id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  company_id UUID REFERENCES public.companies(id) ON DELETE CASCADE
+);
+
+-- Ensure all columns for chatbot_flows exist
 DO $$ 
 BEGIN 
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name='chatbot_flows' AND column_name='is_published') THEN
@@ -24,6 +34,9 @@ BEGIN
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name='chatbot_flows' AND column_name='public_id') THEN
         ALTER TABLE public.chatbot_flows ADD COLUMN public_id text;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name='chatbot_flows' AND column_name='is_active') THEN
+        ALTER TABLE public.chatbot_flows ADD COLUMN is_active boolean DEFAULT false;
     END IF;
 END $$;
 -- Criar tabelas para o sistema de agendamento

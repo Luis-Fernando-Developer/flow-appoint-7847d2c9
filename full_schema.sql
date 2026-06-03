@@ -1,48 +1,12 @@
 
--- STANDALONE DEPLOYMENT SCHEMA - VERSION 7 (BASE TABLE FIX)
+-- STANDALONE DEPLOYMENT SCHEMA - VERSION 8 (CLEAN RECOVERY)
+-- IMPORTANT: For best results, run this on a clean database schema.
 SET check_function_bodies = false;
 SET client_min_messages = warning;
-
--- First, ensure the most fundamental table exists
-CREATE TABLE IF NOT EXISTS public.companies (
-    id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
-    name TEXT,
-    slug TEXT UNIQUE,
-    owner_email TEXT
-);
-
--- Then create chatbot_flows with the necessary relation
-CREATE TABLE IF NOT EXISTS public.chatbot_flows (
-  id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
-  company_id UUID REFERENCES public.companies(id) ON DELETE CASCADE
-);
-
--- Ensure all columns for chatbot_flows exist
-DO $$ 
-BEGIN 
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name='chatbot_flows' AND column_name='is_published') THEN
-        ALTER TABLE public.chatbot_flows ADD COLUMN is_published boolean DEFAULT false;
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name='chatbot_flows' AND column_name='published_at') THEN
-        ALTER TABLE public.chatbot_flows ADD COLUMN published_at timestamptz;
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name='chatbot_flows' AND column_name='published_containers') THEN
-        ALTER TABLE public.chatbot_flows ADD COLUMN published_containers jsonb DEFAULT '[]'::jsonb;
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name='chatbot_flows' AND column_name='published_edges') THEN
-        ALTER TABLE public.chatbot_flows ADD COLUMN published_edges jsonb DEFAULT '[]'::jsonb;
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name='chatbot_flows' AND column_name='public_id') THEN
-        ALTER TABLE public.chatbot_flows ADD COLUMN public_id text;
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name='chatbot_flows' AND column_name='is_active') THEN
-        ALTER TABLE public.chatbot_flows ADD COLUMN is_active boolean DEFAULT false;
-    END IF;
-END $$;
 -- Criar tabelas para o sistema de agendamento
 
 -- Tabela de empresas/estabelecimentos
-CREATE TABLE IF NOT EXISTS public.companies (
+CREATE TABLE public.companies (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   name TEXT NOT NULL,
   slug TEXT NOT NULL UNIQUE,
@@ -65,7 +29,7 @@ CREATE TABLE IF NOT EXISTS public.companies (
 -- Tabela de funcionários/colaboradores
 CREATE TYPE public.employee_role AS ENUM ('owner', 'manager', 'supervisor', 'receptionist', 'employee');
 
-CREATE TABLE IF NOT EXISTS public.employees (
+CREATE TABLE public.employees (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   company_id UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
   user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
@@ -82,7 +46,7 @@ CREATE TABLE IF NOT EXISTS public.employees (
 );
 
 -- Tabela de serviços
-CREATE TABLE IF NOT EXISTS public.services (
+CREATE TABLE public.services (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   company_id UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
@@ -96,7 +60,7 @@ CREATE TABLE IF NOT EXISTS public.services (
 );
 
 -- Tabela de clientes
-CREATE TABLE IF NOT EXISTS public.clients (
+CREATE TABLE public.clients (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   company_id UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
   user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
@@ -115,7 +79,7 @@ CREATE TABLE IF NOT EXISTS public.clients (
 CREATE TYPE public.booking_status AS ENUM ('pending', 'confirmed', 'cancelled', 'completed', 'no_show');
 CREATE TYPE public.payment_status AS ENUM ('pending', 'confirmed', 'cancelled', 'free');
 
-CREATE TABLE IF NOT EXISTS public.bookings (
+CREATE TABLE public.bookings (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   company_id UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
   client_id UUID NOT NULL REFERENCES public.clients(id) ON DELETE CASCADE,
@@ -386,7 +350,7 @@ WITH CHECK (
   )
 );
 -- Create company_customization table to store landing page customizations
-CREATE TABLE IF NOT EXISTS public.company_customizations (
+CREATE TABLE public.company_customizations (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   company_id UUID NOT NULL,
   
@@ -515,7 +479,7 @@ ALTER TABLE public.employees
 ADD COLUMN employee_type TEXT NOT NULL DEFAULT 'fixo' CHECK (employee_type IN ('autonomo', 'fixo'));
 
 -- Criar tabela de relacionamento entre funcionários e serviços
-CREATE TABLE IF NOT EXISTS public.employee_services (
+CREATE TABLE public.employee_services (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   employee_id UUID NOT NULL REFERENCES public.employees(id) ON DELETE CASCADE,
   service_id UUID NOT NULL REFERENCES public.services(id) ON DELETE CASCADE,
@@ -782,7 +746,7 @@ COMMENT ON COLUMN public.company_customizations.button_color IS 'Solid color for
 COMMENT ON COLUMN public.company_customizations.button_gradient IS 'Gradient settings for buttons';
 COMMENT ON COLUMN public.company_customizations.hero_content_position IS 'Hero content position: absolute (over image), below (under image), or above (before image)';
 -- Tabela para armazenar os fluxos de chatbot de cada empresa
-CREATE TABLE IF NOT EXISTS public.chatbot_flows (
+CREATE TABLE public.chatbot_flows (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   company_id UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
   name TEXT NOT NULL DEFAULT 'Novo Fluxo',
@@ -796,7 +760,7 @@ CREATE TABLE IF NOT EXISTS public.chatbot_flows (
 );
 
 -- Tabela para armazenar sessões de conversa dos clientes
-CREATE TABLE IF NOT EXISTS public.chatbot_sessions (
+CREATE TABLE public.chatbot_sessions (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   company_id UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
   flow_id UUID NOT NULL REFERENCES public.chatbot_flows(id) ON DELETE CASCADE,
@@ -942,7 +906,7 @@ USING (
 CREATE TYPE absence_type AS ENUM ('vacation', 'day_off', 'sick_leave', 'suspension', 'other');
 
 -- 1. Tabela de horários de funcionamento da empresa
-CREATE TABLE IF NOT EXISTS public.business_hours (
+CREATE TABLE public.business_hours (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
   day_of_week INTEGER NOT NULL CHECK (day_of_week >= 0 AND day_of_week <= 6), -- 0=Domingo, 6=Sábado
@@ -958,7 +922,7 @@ CREATE TABLE IF NOT EXISTS public.business_hours (
 );
 
 -- 2. Tabela de jornada dos funcionários fixos
-CREATE TABLE IF NOT EXISTS public.employee_schedules (
+CREATE TABLE public.employee_schedules (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   employee_id UUID NOT NULL REFERENCES public.employees(id) ON DELETE CASCADE,
   day_of_week INTEGER NOT NULL CHECK (day_of_week >= 0 AND day_of_week <= 6),
@@ -976,7 +940,7 @@ CREATE TABLE IF NOT EXISTS public.employee_schedules (
 );
 
 -- 3. Tabela de disponibilidade dos autônomos (por data específica)
-CREATE TABLE IF NOT EXISTS public.employee_availability (
+CREATE TABLE public.employee_availability (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   employee_id UUID NOT NULL REFERENCES public.employees(id) ON DELETE CASCADE,
   available_date DATE NOT NULL,
@@ -990,7 +954,7 @@ CREATE TABLE IF NOT EXISTS public.employee_availability (
 );
 
 -- 4. Tabela de ausências (férias, folgas, afastamentos, suspensões)
-CREATE TABLE IF NOT EXISTS public.employee_absences (
+CREATE TABLE public.employee_absences (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   employee_id UUID NOT NULL REFERENCES public.employees(id) ON DELETE CASCADE,
   absence_type absence_type NOT NULL,
@@ -1002,7 +966,7 @@ CREATE TABLE IF NOT EXISTS public.employee_absences (
 );
 
 -- 5. Tabela de bloqueios manuais de horário
-CREATE TABLE IF NOT EXISTS public.blocked_slots (
+CREATE TABLE public.blocked_slots (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   employee_id UUID REFERENCES public.employees(id) ON DELETE CASCADE,
   company_id UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
@@ -1017,7 +981,7 @@ CREATE TABLE IF NOT EXISTS public.blocked_slots (
 );
 
 -- 6. Tabela de configurações gerais de horários da empresa
-CREATE TABLE IF NOT EXISTS public.company_schedule_settings (
+CREATE TABLE public.company_schedule_settings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE UNIQUE,
   -- Intervalo obrigatório
@@ -1348,7 +1312,7 @@ WITH CHECK (
 -- Allow clients to cancel their own bookings (update status to cancelled)
 -- This is covered by the above policy
 -- Tabela de configuração de planos (gerenciada pelo super-admin)
-CREATE TABLE IF NOT EXISTS subscription_plans (
+CREATE TABLE subscription_plans (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   description TEXT,
@@ -1367,7 +1331,7 @@ CREATE TABLE IF NOT EXISTS subscription_plans (
 );
 
 -- Tabela de assinaturas das empresas (com desconto especial)
-CREATE TABLE IF NOT EXISTS company_subscriptions (
+CREATE TABLE company_subscriptions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
   plan_id UUID REFERENCES subscription_plans(id),
@@ -1383,7 +1347,7 @@ CREATE TABLE IF NOT EXISTS company_subscriptions (
 );
 
 -- Tabela de combos de serviços
-CREATE TABLE IF NOT EXISTS service_combos (
+CREATE TABLE service_combos (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id UUID NOT NULL,
   name TEXT NOT NULL,
@@ -1398,7 +1362,7 @@ CREATE TABLE IF NOT EXISTS service_combos (
 );
 
 -- Itens do combo
-CREATE TABLE IF NOT EXISTS service_combo_items (
+CREATE TABLE service_combo_items (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   combo_id UUID REFERENCES service_combos(id) ON DELETE CASCADE,
   service_id UUID NOT NULL,
@@ -1406,7 +1370,7 @@ CREATE TABLE IF NOT EXISTS service_combo_items (
 );
 
 -- Tabela de recompensas/brindes
-CREATE TABLE IF NOT EXISTS client_rewards (
+CREATE TABLE client_rewards (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id UUID NOT NULL,
   reward_service_id UUID,
@@ -1421,7 +1385,7 @@ CREATE TABLE IF NOT EXISTS client_rewards (
 );
 
 -- Estrutura de formas de pagamento do cliente
-CREATE TABLE IF NOT EXISTS client_payment_methods (
+CREATE TABLE client_payment_methods (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   client_id UUID NOT NULL,
   payment_type TEXT NOT NULL,
@@ -1828,7 +1792,7 @@ CREATE UNIQUE INDEX idx_unique_public_id_per_company
 ON public.chatbot_flows (company_id, public_id) 
 WHERE public_id IS NOT NULL;
 -- Tabela de integração com o builder externo (TalkMap)
-CREATE TABLE IF NOT EXISTS public.chatbot_integration (
+CREATE TABLE public.chatbot_integration (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id uuid NOT NULL UNIQUE,
   api_key_encrypted text NOT NULL,
@@ -2105,7 +2069,7 @@ ON CONFLICT (plan_id) DO NOTHING;
 CREATE EXTENSION IF NOT EXISTS pg_cron WITH SCHEMA extensions;
 CREATE EXTENSION IF NOT EXISTS pg_net WITH SCHEMA extensions;
 -- 1. Subconta Asaas por empresa (modo gerenciado)
-CREATE TABLE IF NOT EXISTS public.company_payment_accounts (
+CREATE TABLE public.company_payment_accounts (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id uuid NOT NULL UNIQUE,
   asaas_subaccount_id text,
@@ -2130,7 +2094,7 @@ CREATE POLICY "Authenticated can manage payment accounts"
   WITH CHECK (auth.uid() IS NOT NULL);
 
 -- 2. Configurações de pagamento da empresa
-CREATE TABLE IF NOT EXISTS public.company_payment_settings (
+CREATE TABLE public.company_payment_settings (
   company_id uuid PRIMARY KEY,
   payment_mode text NOT NULL DEFAULT 'none',
   accepted_methods jsonb NOT NULL DEFAULT '{"pix":true,"credit_card":true,"debit_card":true,"boleto":false}'::jsonb,
@@ -2152,7 +2116,7 @@ CREATE POLICY "Authenticated can manage payment settings"
   WITH CHECK (auth.uid() IS NOT NULL);
 
 -- 3. Pagamentos de agendamentos
-CREATE TABLE IF NOT EXISTS public.booking_payments (
+CREATE TABLE public.booking_payments (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   booking_id uuid NOT NULL UNIQUE,
   company_id uuid NOT NULL,
@@ -2210,7 +2174,7 @@ CREATE TRIGGER trg_booking_payments_updated
   FOR EACH ROW EXECUTE FUNCTION public.update_chatbot_updated_at();
 DROP TABLE IF EXISTS public.company_payment_accounts CASCADE;
 ALTER TABLE public.company_payment_settings DROP COLUMN IF EXISTS platform_fee_percentage;
-CREATE TABLE IF NOT EXISTS public.company_credits (
+CREATE TABLE public.company_credits (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   company_id UUID NOT NULL,
   amount NUMERIC NOT NULL DEFAULT 0,

@@ -41,7 +41,7 @@ export function usePlanLimits(companyId?: string) {
       const { data, error } = await supabase.rpc("check_plan_limit", {
         _company_id: companyId,
         _resource: resource,
-      });
+      }).select().maybeSingle();
       if (error) {
         console.error("[usePlanLimits] erro:", error);
         return null;

@@ -116,7 +116,7 @@ export default function ChatbotIntegracao() {
       const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chatbot-integration/save`;
       const res = await fetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`, apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`, apikey: import.meta.env.VITE_SUPABASE_ANON_KEY },
         body: JSON.stringify({ company_id: companyId, api_key: apiKey.trim() }),
       });
       const json = await res.json();
@@ -139,7 +139,7 @@ export default function ChatbotIntegracao() {
       const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chatbot-integration/disconnect?company_id=${companyId}`;
       const res = await fetch(url, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`, apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
+        headers: { Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`, apikey: import.meta.env.VITE_SUPABASE_ANON_KEY },
       });
       if (!res.ok) throw new Error("Erro ao desconectar");
       toast.success("Integração desconectada");

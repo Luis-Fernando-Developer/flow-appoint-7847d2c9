@@ -155,7 +155,10 @@ export default function CreateCompany() {
         const provisionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/provision-talkmap`;
         const provRes = await fetch(provisionUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+          },
           body: JSON.stringify({
             email: formData.owner_email,
             password: formData.owner_password,

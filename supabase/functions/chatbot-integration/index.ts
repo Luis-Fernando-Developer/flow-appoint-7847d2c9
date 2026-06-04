@@ -14,8 +14,8 @@ import { create as createJwt, getNumericDate } from "https://deno.land/x/djwt@v3
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-  "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version, x-request-id",
+  "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS, PUT, PATCH",
 };
 
 const json = (body: unknown, status = 200) =>

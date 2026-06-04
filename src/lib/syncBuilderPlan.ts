@@ -9,7 +9,10 @@ export async function syncBuilderPlan(companyId: string): Promise<void> {
   try {
     const res = await fetch(getEdgeFunctionUrl("sync-builder-plan"), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { 
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+      },
       body: JSON.stringify({ company_id: companyId }),
     });
     const result = await res.json().catch(() => null);

@@ -180,26 +180,31 @@ export default function SuperAdminDashboard() {
     if (!companyToDelete) return;
 
     try {
+      console.log('Iniciando exclusão da empresa:', companyToDelete.id);
+      
       const { error } = await supabase
         .from('companies')
         .delete()
         .eq('id', companyToDelete.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Erro detalhado do Supabase ao excluir:', error);
+        throw error;
+      }
 
       toast({
         title: "Empresa excluída",
-        description: "A empresa foi excluída com sucesso.",
+        description: "A empresa foi excluída com sucesso do banco de dados.",
       });
 
       await fetchData();
       setDeleteDialogOpen(false);
       setCompanyToDelete(null);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting company:', error);
       toast({
-        title: "Erro",
-        description: "Erro ao excluir empresa.",
+        title: "Erro ao excluir",
+        description: error.message || "Verifique se existem registros vinculados que impedem a exclusão ou se as permissões (RLS) estão corretas no banco externo.",
         variant: "destructive",
       });
     }

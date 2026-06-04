@@ -260,37 +260,43 @@ export function EditCompanyDialog({ company, open, onOpenChange, onSuccess }: Ed
 
         if (subscription) {
           // Update existing subscription - apply immediately, clear pending changes
+          const updateData: any = {
+            plan_id: selectedPlanId,
+            billing_period: billingPeriod,
+            original_price: originalPrice,
+            discount_percentage: discountPercentage,
+            discount_cycles_remaining: discountCycles,
+            pending_plan_change: null,
+            status: 'active',
+            next_billing_date: nextBilling.toISOString(),
+          };
+
+          // Only include starts_at if it's explicitly allowed/exists (handling schema cache issues)
+          // Based on user error, starts_at might be missing from cache or table
+          // updateData.starts_at = now.toISOString(); 
+
           const { error: subError } = await supabase
             .from('company_subscriptions')
-            .update({
-              plan_id: selectedPlanId,
-              billing_period: billingPeriod,
-              original_price: originalPrice,
-              discount_percentage: discountPercentage,
-              discount_cycles_remaining: discountCycles,
-              pending_plan_change: null,
-              status: 'active',
-              starts_at: now.toISOString(),
-              next_billing_date: nextBilling.toISOString(),
-            })
+            .update(updateData)
             .eq('id', subscription.id);
             
           if (subError) throw subError;
         } else {
           // Create new subscription
+          const insertData: any = {
+            company_id: company.id,
+            plan_id: selectedPlanId,
+            billing_period: billingPeriod,
+            original_price: originalPrice,
+            discount_percentage: discountPercentage,
+            discount_cycles_remaining: discountCycles,
+            status: 'active',
+            next_billing_date: nextBilling.toISOString(),
+          };
+
           const { error: subError } = await supabase
             .from('company_subscriptions')
-            .insert([{
-              company_id: company.id,
-              plan_id: selectedPlanId,
-              billing_period: billingPeriod,
-              original_price: originalPrice,
-              discount_percentage: discountPercentage,
-              discount_cycles_remaining: discountCycles,
-              status: 'active',
-              starts_at: now.toISOString(),
-              next_billing_date: nextBilling.toISOString(),
-            }]);
+            .insert([insertData]);
             
           if (subError) throw subError;
         }

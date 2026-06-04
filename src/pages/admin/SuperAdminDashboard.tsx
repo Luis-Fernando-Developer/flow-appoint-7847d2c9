@@ -182,14 +182,22 @@ export default function SuperAdminDashboard() {
     try {
       console.log('Iniciando exclusão da empresa:', companyToDelete.id);
       
-      const { error } = await supabase
+      const { data, error, status } = await supabase
         .from('companies')
         .delete()
-        .eq('id', companyToDelete.id);
+        .eq('id', companyToDelete.id)
+        .select();
+
+      console.log('Status da resposta Supabase:', status);
+      console.log('Dados retornados após delete:', data);
 
       if (error) {
         console.error('Erro detalhado do Supabase ao excluir:', error);
         throw error;
+      }
+
+      if (!data || data.length === 0) {
+        throw new Error("A exclusão foi processada, mas o registro não foi removido. Verifique as políticas de RLS no seu banco de dados externo ou se o ID está correto.");
       }
 
       toast({
